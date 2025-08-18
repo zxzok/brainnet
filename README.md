@@ -2,6 +2,17 @@
 
 This project provides a modular preprocessing pipeline for functional MRI data. Several steps can optionally rely on external neuroimaging software packages. These tools are **not** bundled with the library and must be installed separately when the corresponding method is enabled.
 
+## Running the full pipeline
+
+The ``brainnet.main`` module ties together dataset indexing, preprocessing,
+static and dynamic connectivity analyses, and report generation. If you have
+an OpenNeuro dataset ID, the data can be fetched automatically and processed
+in a single command:
+
+```bash
+python -m brainnet.main --openneuro-id ds000114 --subject 01 --task rest
+```
+
 ## Dataset indexing
 
 The :class:`brainnet.data_management.DatasetIndex` helper can enumerate

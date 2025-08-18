@@ -2,6 +2,25 @@
 
 This project provides a modular preprocessing pipeline for functional MRI data. Several steps can optionally rely on external neuroimaging software packages. These tools are **not** bundled with the library and must be installed separately when the corresponding method is enabled.
 
+## Dataset indexing
+
+The :class:`brainnet.data_management.DatasetIndex` helper can enumerate
+BIDS‑style datasets across multiple datatypes. For example:
+
+```python
+from brainnet.data_management import DatasetIndex
+
+index = DatasetIndex('/path/to/bids', datatypes=['func', 'anat', 'dwi'])
+subjects = index.list_subjects()
+anat_imgs = index.get_files('anat', subjects[0])
+for img in anat_imgs:
+    print(img.path, img.metadata.get('acq'))
+```
+
+Metadata from file names (e.g. ``acq-highres``) and sidecar JSON files
+are accessible via the :pyattr:`~brainnet.data_management.BIDSFile.metadata`
+attribute.
+
 ## External Dependencies
 
 | Step | Method | Required command |

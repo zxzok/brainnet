@@ -36,15 +36,23 @@ analyzer
     Contains :class:`DynamicAnalyzer`, a high level interface that
     coordinates sliding window computation, state identification
     according to the chosen method and computation of temporal metrics.
+
+io
+    Helper functions for saving results to disk in CSV and NumPy
+    formats.
 """
 
 from .config import DynamicConfig
 from .model import DynamicMetrics, DynamicStateModel
 from .analyzer import DynamicAnalyzer
+from .io import save_state_matrices, save_state_sequence, save_metrics
 
 __all__ = [
     'DynamicConfig',
     'DynamicMetrics',
     'DynamicStateModel',
     'DynamicAnalyzer',
+    'save_state_sequence',
+    'save_state_matrices',
+    'save_metrics',
 ]

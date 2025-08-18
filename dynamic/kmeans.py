@@ -15,6 +15,12 @@ using K‑means clustering.  The algorithm follows these steps:
 5. Derive temporal metrics such as occupancy, dwell time and
    transition probabilities of the resulting state sequence.
 
+The module also provides :func:`suggest_k` which evaluates silhouette
+scores across candidate cluster counts to recommend an appropriate
+number of states. When ``DynamicConfig.auto_n_states`` is set, this
+recommendation overrides the configured ``n_states`` before running
+K‑means.
+
 The function ``kmeans_analysis`` is intended to be called by the
 high level :class:`brainnet.dynamic.analyzer.DynamicAnalyzer` and
 returns a :class:`brainnet.dynamic.model.DynamicStateModel` object.
@@ -28,10 +34,11 @@ function to work.
 
 from __future__ import annotations
 
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Iterable
 
 import numpy as np
 from sklearn.cluster import KMeans
+from sklearn.metrics import silhouette_score
 
 from .config import DynamicConfig
 from .model import DynamicStateModel
@@ -65,6 +72,51 @@ def _flatten_upper_triangle(matrices: List[np.ndarray]) -> Tuple[np.ndarray, Tup
     return features, iu
 
 
+# ---------------------------------------------------------------------------
+def suggest_k(
+    features: np.ndarray,
+    k_values: Iterable[int] = range(2, 11),
+    random_state: Optional[int] = None,
+) -> int:
+    """Recommend an optimal number of clusters using silhouette scores.
+
+    Parameters
+    ----------
+    features : np.ndarray
+        2D array of shape (n_samples, n_features) with flattened window
+        connectivity features.
+    k_values : Iterable[int], optional
+        Candidate numbers of clusters to evaluate. Defaults to ``range(2, 11)``.
+    random_state : int | None, optional
+        Random seed for K‑means initialisation.
+
+    Returns
+    -------
+    int
+        The candidate K with the highest silhouette score.
+
+    Raises
+    ------
+    ValueError
+        If fewer than two samples are provided or no candidate K is valid.
+    """
+    n_samples = features.shape[0]
+    if n_samples < 2:
+        raise ValueError("At least two samples are required to compute silhouette scores")
+    best_k: Optional[int] = None
+    best_score = -1.0
+    for k in k_values:
+        if k >= n_samples:
+            break
+        labels = KMeans(n_clusters=k, n_init=10, random_state=random_state).fit_predict(features)
+        score = silhouette_score(features, labels)
+        if score > best_score:
+            best_k, best_score = k, score
+    if best_k is None:
+        raise ValueError("Unable to determine a suitable number of states")
+    return best_k
+
+
 def kmeans_analysis(
     roi_timeseries: np.ndarray, config: DynamicConfig, template: Optional[str] = None
 ) -> DynamicStateModel:
@@ -76,7 +128,9 @@ def kmeans_analysis(
         Array of shape (T, N_ROI) with ROI time series.
     config : DynamicConfig
         Configuration specifying window length, step size, number of
-        states and optional random seed.
+        states and optional random seed. If ``config.auto_n_states`` is
+        True the optimal number of clusters is estimated via
+        :func:`suggest_k` and ``n_states`` is overridden.
 
     Returns
     -------
@@ -97,6 +151,8 @@ def kmeans_analysis(
         raise ValueError("No windows could be generated; check window_length and data length")
     # Flatten the upper triangle for clustering
     features, iu = _flatten_upper_triangle(windows)
+    if config.auto_n_states:
+        config.n_states = suggest_k(features, random_state=config.random_state)
     # Run K‑means clustering
     # Use an explicit integer for ``n_init`` instead of ``'auto'``.  Some
     # versions of scikit‑learn do not accept the string 'auto' and will
@@ -136,4 +192,5 @@ def kmeans_analysis(
 
 __all__ = [
     'kmeans_analysis',
+    'suggest_k',
 ]

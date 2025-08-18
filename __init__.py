@@ -84,6 +84,7 @@ from .dynamic import (
     DynamicMetrics,
 )
 from .visualization import ReportConfig, ReportGenerator
+from .multimodal import ModalityConfig, MultimodalPreprocessor
 
 __all__ = [
     'BIDSFile',
@@ -109,4 +110,6 @@ __all__ = [
     'DynamicMetrics',
     'ReportConfig',
     'ReportGenerator',
+    'ModalityConfig',
+    'MultimodalPreprocessor',
 ]

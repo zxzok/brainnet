@@ -153,6 +153,9 @@ class PreprocessedData:
     mask : np.ndarray | None
         Brain mask array (bool) used during ROI extraction, or ``None``
         if not available.
+    roi_labels : Dict[str, Dict[int, str]]
+        For each template, mapping from numeric ROI identifiers to
+        human readable names.
     """
     data: Optional[np.ndarray] = None
     roi_timeseries: Dict[str, np.ndarray] = field(default_factory=dict)
@@ -160,14 +163,15 @@ class PreprocessedData:
     qc_metrics: Dict[str, float] = field(default_factory=dict)
     affine: Optional[np.ndarray] = None
     mask: Optional[np.ndarray] = None
-    roi_labels: Dict[str, Sequence[str]] = field(default_factory=dict)
+    roi_labels: Dict[str, Dict[int, str]] = field(default_factory=dict)
 
     def get_roi_dataframe(self, template: str) -> pd.DataFrame:
         """Return ROI time series for a template as a DataFrame."""
         if template not in self.roi_timeseries:
             raise ValueError(f"No ROI time series available for template '{template}'")
-        labels = self.roi_labels.get(template, [])
-        return pd.DataFrame(self.roi_timeseries[template], columns=list(labels))
+        labels_map = self.roi_labels.get(template, {})
+        columns = list(labels_map.values())
+        return pd.DataFrame(self.roi_timeseries[template], columns=columns)
 
 
 class Preprocessor:
@@ -183,6 +187,7 @@ class Preprocessor:
         self.config.validate()
         # load atlases/templates once if ROI extraction requested
         self._atlas_data: Dict[str, np.ndarray] = {}
+        self._atlas_ids: Dict[str, List[int]] = {}
         self._atlas_labels: Dict[str, List[str]] = {}
         if self.config.extract_roi:
             if nib is None:
@@ -194,24 +199,29 @@ class Preprocessor:
                     tmpl = load_template(name)
                     atlas_img = nib.load(tmpl.atlas_path)
                     self._atlas_data[tmpl.name] = np.asanyarray(atlas_img.get_fdata())
+                    self._atlas_ids[tmpl.name] = list(tmpl.ids)
                     self._atlas_labels[tmpl.name] = [str(l) for l in tmpl.labels]
             # single legacy atlas path
             if self.config.roi_atlas_path:
                 atlas_img = nib.load(self.config.roi_atlas_path)
                 data = np.asanyarray(atlas_img.get_fdata())
-                labels = np.unique(data)
-                labels = labels[labels != 0]
+                ids = np.unique(data)
+                ids = ids[ids != 0]
+                ids = ids.astype(int).tolist()
                 self._atlas_data['custom'] = data
-                self._atlas_labels['custom'] = labels.astype(int).astype(str).tolist()
+                self._atlas_ids['custom'] = ids
+                self._atlas_labels['custom'] = [str(i) for i in ids]
             # multiple custom atlases
             if self.config.custom_atlases:
                 for name, path in self.config.custom_atlases.items():
                     atlas_img = nib.load(path)
                     data = np.asanyarray(atlas_img.get_fdata())
-                    labels = np.unique(data)
-                    labels = labels[labels != 0]
+                    ids = np.unique(data)
+                    ids = ids[ids != 0]
+                    ids = ids.astype(int).tolist()
                     self._atlas_data[name] = data
-                    self._atlas_labels[name] = labels.astype(int).astype(str).tolist()
+                    self._atlas_ids[name] = ids
+                    self._atlas_labels[name] = [str(i) for i in ids]
 
     # ------------------------------------------------------------------
     def preprocess(self, func_path: str, confounds_path: Optional[str] = None) -> PreprocessedData:
@@ -344,8 +354,8 @@ class Preprocessor:
         roi_ts: Dict[str, np.ndarray] = {}
         if self.config.extract_roi and self._atlas_data:
             for name, atlas in self._atlas_data.items():
-                labels = [int(l) for l in self._atlas_labels.get(name, [])]
-                roi_ts[name] = self._extract_roi_time_series(data, atlas, labels)
+                ids = self._atlas_ids.get(name, [])
+                roi_ts[name] = self._extract_roi_time_series(data, atlas, ids)
 
         # optionally discard 4D data to save memory
         data_out: Optional[np.ndarray] = data if self.config.retain_4d else None
@@ -357,17 +367,20 @@ class Preprocessor:
             qc_metrics=qc,
             affine=affine,
             mask=None,
-            roi_labels=self._atlas_labels,
+            roi_labels={
+                name: {i: l for i, l in zip(self._atlas_ids.get(name, []), self._atlas_labels.get(name, []))}
+                for name in self._atlas_data
+            },
         )
 
     # ------------------------------------------------------------------
     def _extract_roi_time_series(
-        self, data: np.ndarray, atlas: np.ndarray, labels: Sequence[int]
+        self, data: np.ndarray, atlas: np.ndarray, ids: Sequence[int]
     ) -> np.ndarray:
         """Compute mean time courses for each ROI defined in ``atlas``."""
         T = data.shape[-1]
-        roi_ts = np.zeros((T, len(labels)), dtype=float)
-        for idx, lbl in enumerate(labels):
+        roi_ts = np.zeros((T, len(ids)), dtype=float)
+        for idx, lbl in enumerate(ids):
             mask = atlas == lbl
             if not np.any(mask):
                 continue

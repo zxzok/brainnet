@@ -28,10 +28,23 @@ from .static import compute_pearson_connectivity, ConnectivityMatrix
 
 @dataclass
 class Template:
-    """Representation of an atlas template."""
+    """Representation of an atlas template.
+
+    Attributes
+    ----------
+    name : str
+        Identifier for the template.
+    atlas_path : str
+        Filesystem path to the atlas NIfTI image.
+    ids : Sequence[int]
+        Numeric region identifiers present in the atlas volume.
+    labels : Sequence[str]
+        Human readable labels corresponding to ``ids``.
+    """
 
     name: str
     atlas_path: str
+    ids: Sequence[int]
     labels: Sequence[str]
 
 
@@ -55,11 +68,17 @@ def load_template(name: str) -> Template:
     if lname == "aal":
         atlas = datasets.fetch_atlas_aal()
         labels = list(atlas.labels)
-        return Template("aal", atlas.maps, labels)
+        if labels and labels[0].lower().startswith("background"):
+            labels = labels[1:]
+        ids = list(range(1, len(labels) + 1))
+        return Template("aal", atlas.maps, ids, labels)
     if lname == "harvardoxford":
         atlas = datasets.fetch_atlas_harvard_oxford('cort-prob-2mm')
         labels = list(atlas.labels)
-        return Template("harvardoxford", atlas.maps, labels)
+        if labels and labels[0].lower().startswith("background"):
+            labels = labels[1:]
+        ids = list(range(1, len(labels) + 1))
+        return Template("harvardoxford", atlas.maps, ids, labels)
     if lname.startswith("schaefer"):
         # name may specify number of ROIs and networks e.g. "schaefer-200-7"
         parts = lname.split('-')
@@ -73,7 +92,10 @@ def load_template(name: str) -> Template:
             n_rois=n_rois, yeo_networks=networks, resolution_mm=2
         )
         labels = list(atlas.labels)
-        return Template(f"schaefer-{n_rois}-{networks}", atlas.maps, labels)
+        if labels and labels[0].lower().startswith("background"):
+            labels = labels[1:]
+        ids = list(range(1, len(labels) + 1))
+        return Template(f"schaefer-{n_rois}-{networks}", atlas.maps, ids, labels)
     raise ValueError(f"Unknown template '{name}'")
 
 
@@ -109,7 +131,8 @@ def construct_network(
 
     if hasattr(data, 'roi_timeseries'):
         roi_ts = data.roi_timeseries[tmpl_name]
-        labels = data.roi_labels[tmpl_name]
+        label_info = data.roi_labels[tmpl_name]
+        labels = list(label_info.values()) if isinstance(label_info, dict) else label_info
     else:
         roi_ts = np.asarray(data)
         if labels is None:

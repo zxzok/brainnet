@@ -1,3 +1,4 @@
+
 """Utility functions for interacting with the OpenNeuro platform."""
 
 from __future__ import annotations
@@ -150,3 +151,4 @@ def download_dataset(dataset_id: str, dest_dir: Path | str) -> Path:
         LOGGER.error("Failed to download dataset %s: %s", dataset_id, exc)
         raise
     return target
+

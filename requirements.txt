@@ -1,6 +1,11 @@
 Flask==2.3.3
 networkx
 openneuro-py
-# datalad  # optional for robust dataset downloads
 openai
+
+requests
+numpy
+pandas
+scipy
+datalad 
 

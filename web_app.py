@@ -23,7 +23,12 @@ from concurrent.futures import ThreadPoolExecutor
 from preprocessing_full import PreprocessPipeline, PreprocessPipelineConfig
 from dynamic import DynamicAnalyzer, DynamicConfig
 from static_analysis import StaticAnalyzer
+
 from visualization import ReportConfig, ReportGenerator
+
+from data_management import DatasetManager
+import openneuro_client
+
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -83,6 +88,16 @@ def init_db():
             FOREIGN KEY (image_id) REFERENCES mri_images (id)
         )
     ''')
+
+    # Track downloaded OpenNeuro datasets
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS openneuro_datasets (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            dataset_id TEXT UNIQUE NOT NULL,
+            path TEXT NOT NULL,
+            downloaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
     
     conn.commit()
     conn.close()
@@ -138,6 +153,44 @@ def process_image(image_id: int, filepath: str) -> None:
         db.commit()
         db.close()
 
+
+def _download_openneuro_dataset(dataset_id: str) -> None:
+    """Download dataset from OpenNeuro and record its path in the database."""
+
+    manager = DatasetManager.fetch_from_openneuro(dataset_id)
+    conn = sqlite3.connect('brainnet.db')
+    cur = conn.cursor()
+    cur.execute(
+        'INSERT OR IGNORE INTO openneuro_datasets (dataset_id, path) VALUES (?, ?)',
+        (dataset_id, manager.root),
+    )
+    conn.commit()
+    conn.close()
+
+
+def _process_openneuro_for_patient(
+    patient_id: int, dataset_id: str, dataset_path: str
+) -> None:
+    """Attach dataset images to a patient and run analysis."""
+
+    manager = DatasetManager(dataset_path)
+    subjects = getattr(manager.index, "_subjects", [])
+    if not subjects:
+        return
+    subject = subjects[0]
+    runs = manager.index.get_functional_runs(subject)
+    for run in runs:
+        conn = sqlite3.connect('brainnet.db')
+        cur = conn.cursor()
+        cur.execute(
+            'INSERT INTO mri_images (patient_id, image_path, image_type, description) VALUES (?, ?, ?, ?)',
+            (patient_id, run.path, 'func', f'OpenNeuro {dataset_id}'),
+        )
+        image_id = cur.lastrowid
+        conn.commit()
+        conn.close()
+        process_image(image_id, run.path)
+
 # Routes
 @app.route('/')
 def index():
@@ -169,6 +222,34 @@ def patients():
     
     return render_template('patients.html', patients=patients)
 
+
+@app.route('/openneuro')
+def openneuro():
+    """Display available OpenNeuro datasets."""
+    search = request.args.get('q', '')
+    page = request.args.get('page', 1, type=int)
+    result = openneuro_client.list_datasets(search=search, page=page)
+    conn = sqlite3.connect('brainnet.db')
+    cur = conn.cursor()
+    cur.execute('SELECT dataset_id FROM openneuro_datasets')
+    downloaded = {row[0] for row in cur.fetchall()}
+    conn.close()
+    return render_template(
+        'openneuro.html',
+        datasets=result['datasets'],
+        search=search,
+        page=page,
+        has_next=result['has_next'],
+        downloaded=downloaded,
+    )
+
+
+@app.route('/openneuro/download', methods=['POST'])
+def download_openneuro():
+    dataset_id = request.form['dataset_id']
+    executor.submit(_download_openneuro_dataset, dataset_id)
+    return redirect(url_for('openneuro'))
+
 @app.route('/patient/<int:patient_id>')
 def patient_detail(patient_id):
     """Show details of a specific patient."""
@@ -181,17 +262,24 @@ def patient_detail(patient_id):
     
     # Get associated MRI images
     cursor.execute('''
-        SELECT id, image_path, image_type, acquisition_date, description, created_at 
-        FROM mri_images 
-        WHERE patient_id = ? 
+        SELECT id, image_path, image_type, acquisition_date, description, created_at
+        FROM mri_images
+        WHERE patient_id = ?
         ORDER BY created_at DESC
     ''', (patient_id,))
     images = cursor.fetchall()
-    
+    cursor.execute('SELECT dataset_id FROM openneuro_datasets ORDER BY downloaded_at DESC')
+    on_datasets = cursor.fetchall()
+
     conn.close()
-    
+
     if patient:
-        return render_template('patient_detail.html', patient=patient, images=images)
+        return render_template(
+            'patient_detail.html',
+            patient=patient,
+            images=images,
+            openneuro_datasets=on_datasets,
+        )
     else:
         return "Patient not found", 404
 
@@ -374,6 +462,21 @@ def upload_image(patient_id):
             return f"Upload failed: {exc}", 500
 
     return "Upload failed", 500
+
+
+@app.route('/patient/<int:patient_id>/use_openneuro', methods=['POST'])
+def use_openneuro(patient_id):
+    """Process a downloaded OpenNeuro dataset for this patient."""
+
+    dataset_id = request.form['dataset_id']
+    conn = sqlite3.connect('brainnet.db')
+    cur = conn.cursor()
+    cur.execute('SELECT path FROM openneuro_datasets WHERE dataset_id = ?', (dataset_id,))
+    row = cur.fetchone()
+    conn.close()
+    if row:
+        executor.submit(_process_openneuro_for_patient, patient_id, dataset_id, row[0])
+    return redirect(url_for('patient_detail', patient_id=patient_id))
 
 @app.route('/delete_image/<int:image_id>', methods=['POST'])
 def delete_image(image_id):

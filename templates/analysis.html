@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block title %}Analysis Results - BrainNet MRI Data Management{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Analysis Results</h1>
+</div>
+
+<div class="row">
+    <div class="col-md-12">
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title">Static/ Dynamic Analysis</h5>
+                <div id="analysis-charts">
+                    <!-- Example placeholder for charts -->
+                    <canvas id="resultChart" height="120"></canvas>
+                </div>
+                <p class="mt-3">Analysis results and visualizations will be shown here.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+// Example chart.js usage
+const ctx = document.getElementById('resultChart').getContext('2d');
+const resultChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+        labels: ['Feature 1', 'Feature 2', 'Feature 3'],
+        datasets: [{
+            label: 'Value',
+            data: [12, 19, 3],
+            backgroundColor: 'rgba(54, 162, 235, 0.5)'
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: {
+            legend: { display: false }
+        }
+    }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block title %}Image Gallery - BrainNet MRI Data Management{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">MRI Image Gallery</h1>
+</div>
+
+<div class="row">
+    {% if images %}
+        {% for image in images %}
+        <div class="col-md-3 mb-4">
+            <div class="card h-100">
+                <img src="/{{ image[1] }}" class="card-img-top" alt="MRI Image" style="object-fit:cover; height:200px;">
+                <div class="card-body">
+                    <h6 class="card-title">{{ image[2] or 'Unknown Type' }}</h6>
+                    <p class="card-text">{{ image[4] or '' }}</p>
+                    <a href="/{{ image[1] }}" target="_blank" class="btn btn-sm btn-outline-primary">View Full</a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    {% else %}
+        <div class="col-12 text-center">
+            <p>No images found.</p>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

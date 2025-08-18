@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block title %}Features - BrainNet MRI Data Management{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Computed Features</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <a href="{{ url_for('patient_detail', patient_id=1) }}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Back to Patient
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-12">
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title">Image Information</h5>
+                <dl class="row">
+                    <dt class="col-sm-3">Patient:</dt>
+                    <dd class="col-sm-9">{{ image_info[1] }}</dd>
+                </dl>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Computed Features</h5>
+            </div>
+            <div class="card-body">
+                {% if features %}
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Feature Name</th>
+                                    <th>Value</th>
+                                    <th>Type</th>
+                                    <th>Calculated At</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for feature in features %}
+                                    <tr>
+                                        <td>{{ feature[0] }}</td>
+                                        <td>{{ "%.4f"|format(feature[1]) }}</td>
+                                        <td>{{ feature[2] or 'N/A' }}</td>
+                                        <td>{{ feature[3] }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p>No features computed for this image.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

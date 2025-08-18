@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block title %}MRI Visualization - BrainNet MRI Data Management{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1>MRI Brain Visualization</h1>
+    <div id="viewer" style="width:512px; height:512px; border:1px solid #ccc; margin-bottom:20px"></div>
+    <div class="btn-group">
+        <button id="axialBtn" class="btn btn-primary">Axial View</button>
+        <button id="coronalBtn" class="btn btn-primary">Coronal View</button>
+        <button id="sagittalBtn" class="btn btn-primary">Sagittal View</button>
+    </div>
+</div>
+
+<!-- Include Cornerstone.js and its tools -->
+<script src="https://unpkg.com/cornerstone-core@2.3.0/dist/cornerstone.js"></script>
+<script src="https://unpkg.com/cornerstone-tools@4.20.1/dist/cornerstoneTools.js"></script>
+
+<script>
+    // Initialize the viewer
+    function initializeViewer(dicomUrl) {
+        var element = document.getElementById('viewer');
+        cornerstone.enable(element);
+        cornerstone.loadImage(dicomUrl).then(function(image) {
+            cornerstone.displayImage(element, image);
+        }, function(err) {
+            console.error('Error loading image:', err);
+        });
+    }
+
+    document.getElementById('axialBtn').addEventListener('click', function(){
+       // Replace the URL with the actual DICOM image URL for Axial view
+       var dicomUrl = 'wadouri:http://example.com/dicom/axial.dcm';
+       initializeViewer(dicomUrl);
+       console.log('Axial view loaded');
+    });
+
+    document.getElementById('coronalBtn').addEventListener('click', function(){
+       // Replace the URL with the actual DICOM image URL for Coronal view
+       var dicomUrl = 'wadouri:http://example.com/dicom/coronal.dcm';
+       initializeViewer(dicomUrl);
+       console.log('Coronal view loaded');
+    });
+
+    document.getElementById('sagittalBtn').addEventListener('click', function(){
+       // Replace the URL with the actual DICOM image URL for Sagittal view
+       var dicomUrl = 'wadouri:http://example.com/dicom/sagittal.dcm';
+       initializeViewer(dicomUrl);
+       console.log('Sagittal view loaded');
+    });
+</script>
+{% endblock %}

@@ -1,3 +1,4 @@
+
 """
 visualization
 ==============
@@ -144,27 +145,25 @@ class ReportGenerator:
             qc_html = "<h2>Quality Metrics</h2><ul>" + "".join(qc_lines) + "</ul>"
             sections.append(qc_html)
         # connectivity
-        sections.append("<h2>Static Connectivity Matrix</h2>" + self._figure_to_html(fig_conn))
-        sections.append("<h3>Node Metrics</h3>" + self._figure_to_html(fig_nodes))
+        sections.append("<h2>Static Connectivity Matrix</h2>" + self._figure_to_html(self._plot_connectivity_heatmap(conn_matrix)))
+        sections.append("<h3>Node Metrics</h3>" + self._figure_to_html(self._plot_node_metrics(graph_metrics, roi_labels)))
         # dynamic
-        sections.append("<h2>Dynamic Connectivity</h2>" + self._figure_to_html(fig_dyn))
-        sections.append("<h3>State Timeline</h3>" + self._figure_to_html(fig_timeline))
-        sections.append("<h3>State Transition Matrix</h3>" + self._figure_to_html(fig_trans))
-        sections.append("<h3>State Occupancy and Dwell Time</h3>" + self._figure_to_html(fig_occupancy))
-        # compile full HTML
-        html_content = "<html><head><meta charset=\"utf-8\">"
-        html_content += "<title>Brain Connectivity Report - Subject {}</title>".format(html.escape(subject_id))
-        # include Plotly.js via CDN once
-        html_content += pio.to_html(go.Figure(), include_plotlyjs='cdn', full_html=False, config={'displayModeBar': False}).split("<body>")[0]
-        html_content += "</head><body>\n"
-        html_content += "\n".join(sections)
-        html_content += "</body></html>"
-        # write to file
-        filename = f"report_subject_{subject_id}.html"
-        filepath = os.path.join(self.config.output_dir, filename)
-        with open(filepath, 'w', encoding='utf-8') as f:
+        sections.append("<h2>Dynamic Connectivity</h2>" + self._figure_to_html(self._plot_dynamic_metric(dyn_model)))
+        sections.append("<h3>State Timeline</h3>" + self._figure_to_html(self._plot_state_timeline(dyn_model, self.config.time_unit)))
+        sections.append("<h3>Transition Matrix</h3>" + self._figure_to_html(self._plot_transition_matrix(dyn_model)))
+        sections.append("<h3>State Occupancy</h3>" + self._figure_to_html(self._plot_state_occupancy(dyn_model)))
+        
+        # Add dynamic brain network visualization section using external software
+        sections.append("<h2>Dynamic Brain Network Visualization</h2>" + self._plot_dynamic_network_features(dyn_model))
+        
+        # Assemble final HTML
+        html_content = "<html><head><meta charset='utf-8'><title>Report for Subject " + html.escape(subject_id) + "</title></head><body>" + "".join(sections) + "</body></html>"
+
+        # Save the HTML report
+        report_path = os.path.join(self.config.output_dir, f"report_{subject_id}.html")
+        with open(report_path, 'w', encoding='utf-8') as f:
             f.write(html_content)
-        return filepath
+        return report_path
 
     # --------------------------------------------------------------
     def _figure_to_html(self, fig: go.Figure) -> str:
@@ -347,6 +346,35 @@ class ReportGenerator:
             height=400,
         )
         return fig
+
+    # --------------------------------------------------------------
+    def _plot_dynamic_network_features(self, dyn_model: DynamicStateModel) -> str:
+        """Generate dynamic brain network visualization using an external tool (e.g. BrainNetViewer).
+
+        This method writes dynamic network extra metrics to a temporary JSON file and calls an
+        external BrainNetViewer tool to generate a visualization image. The resulting image is then
+        embedded into the HTML report.
+        """
+        import tempfile
+        import json
+        import subprocess
+
+        # Write dynamic network extra metrics to a temporary JSON file
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.json', dir=self.config.output_dir) as tmp:
+            json.dump(dyn_model.metrics.extra, tmp, indent=2)
+            tmp_path = tmp.name
+
+        # Define output image file path
+        output_img = tmp_path.replace('.json', '.png')
+
+        try:
+            # Call external BrainNetViewer command line tool
+            # Assumes BrainNetViewer is installed and available in PATH
+            subprocess.run(['brainnetviewer', '--input', tmp_path, '--output', output_img], check=True)
+            html_fig = f"<img src='{output_img}' alt='Dynamic Network Visualization' style='max-width:100%;'/>"
+        except Exception as e:
+            html_fig = "<p>BrainNetViewer visualization is not available.</p>"
+        return html_fig
 
 
 __all__ = [

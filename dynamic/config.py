@@ -31,9 +31,14 @@ class DynamicConfig:
         Number of discrete states or clusters to identify.  The
         interpretation depends on the chosen method.  Defaults to 4.
     auto_n_states : bool, optional
-        If True, the optimal number of states is estimated automatically
-        using silhouette scores.  When enabled ``n_states`` is treated as
-        an initial guess and replaced by the recommended value.
+        If True, the optimal number of states is estimated automatically.
+        For K‑means this uses silhouette scores; for HMM a search based on
+        information criteria is performed.  When enabled ``n_states`` is
+        treated as an initial guess and replaced by the recommended value.
+    n_states_criterion : str, optional
+        Criterion used when automatically estimating the number of HMM
+        states.  Supported values are ``'bic'`` (default) and ``'aic'``.
+        Ignored for other methods.
     method : str, optional
         Method used for state identification.  Supported values are
         ``'kmeans'`` (default), ``'hmm'`` and ``'cap'``.
@@ -53,6 +58,7 @@ class DynamicConfig:
     step: int
     n_states: int = 4
     auto_n_states: bool = False
+    n_states_criterion: str = 'bic'
     method: str = 'kmeans'
     cap_threshold: float = 1.5
     output_dir: Optional[str] = None
@@ -78,3 +84,6 @@ class DynamicConfig:
             raise ValueError("window_length exceeds number of time points in data")
         if self.method not in {'kmeans', 'hmm', 'cap'}:
             raise ValueError(f"Unknown dynamic method '{self.method}'")
+        if self.method == 'hmm' and self.auto_n_states:
+            if self.n_states_criterion not in {'bic', 'aic'}:
+                raise ValueError("n_states_criterion must be 'bic' or 'aic'")

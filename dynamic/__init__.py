@@ -28,6 +28,11 @@ metrics
     Provides functions to compute temporal statistics (occupancy,
     dwell time, transition probabilities) from a state sequence.
 
+state_features
+    Utilities to derive graph metrics (e.g. global efficiency and
+    modularity) from state connectivity matrices.  Requires
+    ``networkx``.
+
 kmeans, hmm, cap
     Implement specific methods for state identification via K‑means
     clustering, Gaussian HMMs or co‑activation pattern (CAP) analysis.

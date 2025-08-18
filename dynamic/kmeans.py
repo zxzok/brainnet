@@ -36,6 +36,7 @@ from sklearn.cluster import KMeans
 from .config import DynamicConfig
 from .model import DynamicStateModel
 from .metrics import compute_state_metrics
+from .state_features import compute_state_features
 from .window import sliding_window_connectivity
 
 
@@ -120,8 +121,11 @@ def kmeans_analysis(
         centroids.append(mat)
     # Compute temporal metrics from state labels
     metrics = compute_state_metrics(labels, config.n_states)
+    # Derive graph features from centroid connectivity matrices
+    state_features = compute_state_features(centroids)
     extra = {
         'window_metric': window_metric,
+        'state_features': state_features,
     }
     return DynamicStateModel(
         method='kmeans',

@@ -40,6 +40,10 @@ class DynamicConfig:
     cap_threshold : float, optional
         Threshold in standard deviations for selecting high amplitude
         events in CAP analysis.  Defaults to 1.5.
+    output_dir : str | None, optional
+        If provided, results from :class:`brainnet.dynamic.analyzer.DynamicAnalyzer`
+        will be written to this directory using helpers in
+        :mod:`brainnet.dynamic.io`.
     random_state : int | None, optional
         Random seed for initialising clustering algorithms.  Defaults
         to None, meaning no specific seed is set.
@@ -51,6 +55,7 @@ class DynamicConfig:
     auto_n_states: bool = False
     method: str = 'kmeans'
     cap_threshold: float = 1.5
+    output_dir: Optional[str] = None
     random_state: Optional[int] = None
 
     def validate(self, n_timepoints: int) -> None:

@@ -340,26 +340,45 @@ class DatasetManager:
         else:  # pragma: no cover - logging side effect
             logger.warning("participants.tsv not found at %s", participants_path)
 
-    @classmethod
-    def fetch_from_openneuro(cls, dataset_id: str, target_root: str) -> "DatasetManager":
-        """Download an OpenNeuro dataset and create a manager for it.
+
+    @staticmethod
+    def fetch_from_openneuro(dataset_id: str, target_dir: str | None = None) -> str:
+        """Download a dataset from OpenNeuro and return the local path.
+
 
         Parameters
         ----------
         dataset_id:
-            Identifier of the OpenNeuro dataset, e.g. ``'ds000001'``.
-        target_root:
-            Directory where the dataset should be stored. The dataset will be
-            downloaded into ``target_root/<dataset_id>`` if not already
-            present.
+
+            The OpenNeuro dataset identifier (e.g. ``ds000114``).
+        target_dir:
+            Directory where the dataset should be stored. If omitted, a
+            directory named after ``dataset_id`` in the current working
+            directory will be used.
+
+        Returns
+        -------
+        str
+            Absolute path to the downloaded dataset root.
+
+        Raises
+        ------
+        RuntimeError
+            If the optional ``openneuro`` dependency is not available.
         """
 
-        if openneuro_client is None:
-            raise RuntimeError("openneuro_client is required to fetch datasets")
-        os.makedirs(target_root, exist_ok=True)
-        openneuro_client.download_dataset(dataset=dataset_id, target_dir=target_root)
-        dataset_path = os.path.join(os.path.abspath(target_root), dataset_id)
-        return cls(dataset_path)
+        try:  # pragma: no cover - external dependency
+            import openneuro
+        except ImportError as exc:  # pragma: no cover - informative error
+            raise RuntimeError(
+                "The 'openneuro' package is required to fetch datasets"
+            ) from exc
+
+        target_dir = os.path.abspath(target_dir or dataset_id)
+        # The openneuro library exposes a convenience download function.
+        openneuro.download(dataset=dataset_id, target_dir=target_dir)
+        return target_dir
+
 
 
 __all__ = [

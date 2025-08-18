@@ -2,10 +2,12 @@ import os
 import sys
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 # Ensure package import path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+import data_management as dm
 from data_management import DatasetIndex
 
 
@@ -55,4 +57,27 @@ def test_index_diffusion_files(tmp_path):
     assert f.run == "1"
     assert f.metadata["dir"] == "AP"
     assert f.metadata["PhaseEncodingDirection"] == "j-"
+
+
+def test_index_from_openneuro(monkeypatch, tmp_path):
+    calls: list[tuple[str, str]] = []
+
+    def fake_download_dataset(*, dataset: str, target_dir: str, **kwargs):
+        calls.append((dataset, target_dir))
+        ds_dir = Path(target_dir) / dataset / "sub-01" / "anat"
+        ds_dir.mkdir(parents=True)
+        _touch(ds_dir / "sub-01_T1w.nii.gz")
+
+    fake_client = SimpleNamespace(download_dataset=fake_download_dataset)
+    monkeypatch.setattr(dm, "openneuro_client", fake_client)
+    monkeypatch.setenv("HOME", str(tmp_path))
+
+    index = DatasetIndex("ds999999", datatypes="anat", source="openneuro")
+    files = index.get_files("anat", "01")
+    assert len(files) == 1
+    assert calls
+    # Subsequent initialisation should use cache
+    calls.clear()
+    DatasetIndex("ds999999", datatypes="anat", source="openneuro")
+    assert calls == []
 

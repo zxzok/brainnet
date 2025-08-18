@@ -20,6 +20,7 @@ then call :meth:`analyse` on ROI time series to obtain a
 from __future__ import annotations
 
 from typing import Optional
+from pathlib import Path
 
 import numpy as np
 
@@ -28,6 +29,7 @@ from .model import DynamicStateModel
 from .kmeans import kmeans_analysis
 from .hmm import hmm_analysis
 from .cap import cap_analysis
+from .io import save_state_matrices, save_state_sequence, save_metrics
 
 
 class DynamicAnalyzer:
@@ -42,10 +44,12 @@ class DynamicAnalyzer:
     Examples
     --------
     >>> from brainnet.dynamic import DynamicConfig, DynamicAnalyzer
-    >>> cfg = DynamicConfig(window_length=30, step=5, n_states=4, method='kmeans')
+    >>> cfg = DynamicConfig(window_length=30, step=5, n_states=4,
+    ...                     method='kmeans', output_dir='dyn_out')
     >>> analyzer = DynamicAnalyzer(cfg)
     >>> result = analyzer.analyse(roi_timeseries)
-    >>> print(result.metrics.occupancy)
+    >>> seq = np.load('dyn_out/state_sequence.npy')
+    >>> print(seq.shape)
     """
 
     def __init__(self, config: DynamicConfig) -> None:
@@ -80,13 +84,21 @@ class DynamicAnalyzer:
         """
         method = self.config.method
         if method == 'kmeans':
-            return kmeans_analysis(roi_timeseries, self.config, template)
+            model = kmeans_analysis(roi_timeseries, self.config, template)
         elif method == 'hmm':
-            return hmm_analysis(roi_timeseries, self.config, template)
+            model = hmm_analysis(roi_timeseries, self.config, template)
         elif method == 'cap':
-            return cap_analysis(roi_timeseries, self.config, template)
+            model = cap_analysis(roi_timeseries, self.config, template)
         else:
             raise ValueError(f"Unknown dynamic analysis method '{method}'")
+
+        if self.config.output_dir:
+            out_dir = Path(self.config.output_dir)
+            save_state_sequence(model.state_sequence, out_dir)
+            save_state_matrices(model.states, out_dir)
+            save_metrics(model.metrics, out_dir)
+
+        return model
 
 
 __all__ = [

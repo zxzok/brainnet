@@ -104,9 +104,12 @@ def run_pipeline(dataset_path: str, subject: str, task: str, output_dir: str) ->
     conn = static_analyzer.compute_connectivity(roi_ts, roi_labels)
     graph_metrics = static_analyzer.compute_graph_metrics(conn)
     # dynamic analysis
-    dyn_cfg = DynamicConfig(window_length=30, step=10, n_states=4, method='kmeans')
+    dyn_out = Path(output_dir) / 'dynamic'
+    dyn_cfg = DynamicConfig(window_length=30, step=10, n_states=4,
+                            method='kmeans', output_dir=dyn_out)
     dyn_analyzer = DynamicAnalyzer(dyn_cfg)
     dyn_model = dyn_analyzer.analyse(roi_ts)
+    _ = np.load(dyn_out / 'state_sequence.npy')
     # generate report
     rep_cfg = ReportConfig(output_dir=output_dir)
     rep_gen = ReportGenerator(rep_cfg)

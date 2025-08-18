@@ -4,12 +4,14 @@ data_management
 
 This module implements a simple indexer for BIDS‑like datasets.  The aim
 is to provide a lightweight way to enumerate subjects, sessions and
-functional runs without forcing users to load large NIfTI images up
-front.  Each run is represented by a :class:`BIDSFile` object which
+imaging files without forcing users to load large NIfTI images up
+front.  Each file is represented by a :class:`BIDSFile` object which
 stores the path to the imaging file along with parsed metadata.  The
-dataset indexer can retrieve lists of runs and associated metadata for
+dataset indexer can retrieve lists of files and associated metadata for
 subsequent processing.
 
+
+=======
 In addition to the low‑level :class:`DatasetIndex`, a high‑level
 convenience wrapper :class:`DatasetManager` is provided.  It augments the
 index with demographic information loaded from a ``participants.tsv``
@@ -23,14 +25,19 @@ sidecar files containing sequence parameters.  Additional datatypes
 (such as ``anat`` or ``dwi``) could be added by extending the
 ``_discover_files`` method.
 
+
 Example
 -------
 >>> from brainnet.data_management import DatasetIndex
->>> index = DatasetIndex('/path/to/bids_dataset')
+>>> index = DatasetIndex('/path/to/bids_dataset', datatypes=['func', 'anat'])
 >>> subjects = index.list_subjects()
 >>> runs = index.get_functional_runs(subjects[0])
+>>> t1w = index.get_files(subjects[0], datatype='anat')
 >>> for run in runs:
 ...     print(run.path, run.metadata.get('RepetitionTime'))
+
+>>> for img in t1w:
+...     print(img.path, img.suffix)
 
 Note
 ----
@@ -49,6 +56,8 @@ import csv
 import logging
 
 from dataclasses import dataclass, field
+
+
 from typing import Any, Dict, List, Optional, Tuple
 import csv
 
@@ -61,6 +70,7 @@ class Patient:
 
     participant_id: str
     data: Dict[str, str] = field(default_factory=dict)
+
 
 
 @dataclass
@@ -181,22 +191,26 @@ class DatasetIndex:
 
     The dataset is parsed at initialisation.  Subjects and sessions are
     discovered by scanning directories that match the BIDS naming
-    conventions (``sub-<label>`` and ``ses-<label>``).  Functional
-    runs are identified by filenames containing the ``task-`` and
-    ``_bold`` patterns.
+    conventions (``sub-<label>`` and ``ses-<label>``).  Files for the
+    requested BIDS ``datatypes`` are indexed by parsing standard entity
+    names from their filenames.
 
     Parameters
     ----------
     root : str
         Path to the root of the BIDS dataset.
+    datatypes : list[str] | None, optional
+        BIDS datatypes to index.  Defaults to ``['func']``.
     """
 
     def __init__(self, root: str, datatypes: Optional[List[str]] | None = None) -> None:
         self.root = os.path.abspath(root)
         if not os.path.exists(self.root):
             raise FileNotFoundError(f"Dataset path does not exist: {self.root}")
+
         # datatypes to index (e.g. ['func', 'anat', 'dwi'])
         self.datatypes = datatypes or ['func']
+
         self._subjects: List[str] = []
         # index: subject -> session -> list of BIDSFile
         self._index: Dict[str, Dict[Optional[str], List[BIDSFile]]] = {}
@@ -204,7 +218,7 @@ class DatasetIndex:
 
     # -- discovery ---------------------------------------------------------
     def _parse_dataset(self) -> None:
-        """Discover subjects, sessions and functional runs."""
+        """Discover subjects, sessions and run files for configured datatypes."""
         # identify subject directories
         for entry in sorted(os.listdir(self.root)):
             if entry.startswith('sub-') and os.path.isdir(os.path.join(self.root, entry)):
@@ -220,9 +234,7 @@ class DatasetIndex:
                         has_session = True
                         session_label = ses_entry[len('ses-'):]
                         self._index[subject_label][session_label] = []
-                        self._discover_files(
-                            subject_label, session_label, ses_path, self.datatypes
-                        )
+
                 if not has_session:
                     # no sessions: treat subject directory as session None
                     self._index[subject_label][None] = []
@@ -233,9 +245,15 @@ class DatasetIndex:
         subject: str,
         session: Optional[str],
         base_path: str,
+
+        datatypes: Optional[List[str]] | None = None,
+    ) -> None:
+        """Populate index with files located under ``base_path`` for given datatypes.
+
         datatypes: List[str],
     ) -> None:
         """Populate index with imaging files located under ``base_path``.
+
 
         Parameters
         ----------
@@ -247,18 +265,32 @@ class DatasetIndex:
         base_path : str
             Path to search for datatype directories (should be the subject or
             ``ses-`` directory).
-        datatypes : list[str]
-            List of datatype directory names to search (e.g. ``['func', 'anat']``).
+
+        datatypes : list[str] | None, optional
+            List of BIDS datatype directories to index.  Defaults to
+            ``['func']``.
         """
+        if datatypes is None:
+            datatypes = ["func"]
+
+
         for dtype in datatypes:
             dtype_dir = os.path.join(base_path, dtype)
             if not os.path.isdir(dtype_dir):
                 continue
             for fname in sorted(os.listdir(dtype_dir)):
+
+                if not fname.endswith('.nii') and not fname.endswith('.nii.gz'):
+                    continue
+                # parse BIDS entities from filename
+                name, _ = os.path.splitext(fname)
+                if name.endswith('.nii'):  # remove .gz suffix if present
+
                 if not (fname.endswith('.nii') or fname.endswith('.nii.gz')):
                     continue
                 name, _ = os.path.splitext(fname)
                 if name.endswith('.nii'):  # handle .nii.gz
+
                     name, _ = os.path.splitext(name)
                 tokens = name.split('_')
                 task = None
@@ -269,6 +301,7 @@ class DatasetIndex:
                         task = tok[len('task-'):]
                     elif tok.startswith('run-'):
                         run = tok[len('run-'):]
+
                     elif tok.startswith('sub-') or tok.startswith('ses-'):
                         continue
                     else:
@@ -276,6 +309,7 @@ class DatasetIndex:
                 if suffix is None:
                     suffix = 'bold' if dtype == 'func' else dtype
                 fpath = os.path.join(dtype_dir, fname)
+
                 json_path = fpath.replace('.nii.gz', '.json').replace('.nii', '.json')
                 metadata: Dict = {}
                 if os.path.exists(json_path):
@@ -312,19 +346,70 @@ class DatasetIndex:
         return list(self._index[subject].keys())
 
     def get_files(
-        self, datatype: str, subject: str, session: Optional[str] | None = None
+
+        self,
+        subject: str,
+        session: Optional[str] | None = None,
+        datatype: Optional[str] | None = None,
     ) -> List[BIDSFile]:
-        """Retrieve files of a given datatype for a subject and optional session."""
+        """Retrieve files for a subject and optional session.
+
+        Parameters
+        ----------
+        subject : str
+            Subject identifier without ``sub-`` prefix.
+        session : str | None, optional
+            Session identifier without ``ses-`` prefix.  If ``None`` and the
+            subject has multiple sessions, files from all sessions are
+            returned.
+        datatype : str | None, optional
+            If provided, only files matching this BIDS datatype are
+            returned.
+
+        Returns
+        -------
+        List[BIDSFile]
+            List of :class:`BIDSFile` entries matching the query.
+        """
         if subject not in self._index:
             raise KeyError(f"Subject {subject} not found in dataset")
-        if session is None:
-            files: List[BIDSFile] = []
-            for ses_files in self._index[subject].values():
-                files.extend(f for f in ses_files if f.datatype == datatype)
-            return files
-        if session not in self._index[subject]:
-            raise KeyError(f"Session {session} not found for subject {subject}")
-        return [f for f in self._index[subject][session] if f.datatype == datatype]
+        sessions = (
+            [session]
+            if session is not None
+            else list(self._index[subject].keys())
+        )
+        files: List[BIDSFile] = []
+        for ses in sessions:
+            if ses not in self._index[subject]:
+                raise KeyError(f"Session {ses} not found for subject {subject}")
+            ses_files = self._index[subject][ses]
+            if datatype is None:
+                files.extend(ses_files)
+            else:
+                files.extend([f for f in ses_files if f.datatype == datatype])
+        return files
+
+    def get_functional_runs(
+        self, subject: str, session: Optional[str] | None = None
+    ) -> List[BIDSFile]:
+        """Retrieve functional runs for a subject (and optional session).
+
+        Parameters
+        ----------
+        subject : str
+            Subject identifier without ``sub-`` prefix.
+        session : str | None, optional
+            Session identifier without ``ses-`` prefix.  If omitted and
+            the subject has multiple sessions, runs from all sessions
+            will be returned.
+
+        Returns
+        -------
+        List[BIDSFile]
+            List of :class:`BIDSFile` entries representing BOLD runs.
+        """
+        return self.get_files(subject, session=session, datatype='func')
+
 
     def get_functional_runs(
         self, subject: str, session: Optional[str] | None = None
@@ -358,8 +443,4 @@ __all__ = [
     'Patient',
     'DatasetIndex',
 
-    'Patient',
-    'DatasetManager',
-    'parse_participants_tsv',
 
-]

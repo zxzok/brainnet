@@ -1,10 +1,11 @@
 Flask==2.3.3
 networkx
 openneuro-py
+openai
+
 requests
 numpy
 pandas
 scipy
 datalad 
-
 

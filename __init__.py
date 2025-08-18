@@ -36,58 +36,82 @@ where needed but may not be available in every runtime environment.  If
 these packages are missing the corresponding functionality will not work.
 """
 
-from .data_management import BIDSFile, DatasetIndex
-# Expose the simple and full preprocessing pipelines.  ``PreprocConfig`` and
-# ``Preprocessor`` implement a lightweight pipeline suitable for quick
-# connectivity analyses, whereas ``PreprocessPipelineConfig`` and
-# ``PreprocessPipeline`` (defined in ``preprocessing_full``) provide a
-# more modular architecture with pluggable steps.  Users can choose the
-# pipeline appropriate to their needs.  See the documentation in
-# ``preprocessing.py`` and ``preprocessing_full.py`` for details.
-from .preprocessing import PreprocConfig, Preprocessor, PreprocessedData
-from .preprocessing_full import (
-    PreprocessPipelineConfig,
-    PreprocessPipeline,
-    SliceTimingConfig,
-    MotionCorrectionConfig,
-    SpatialNormalizationConfig,
-    SmoothingConfig,
-    TemporalFilterConfig,
-    NuisanceRegressionConfig,
-    RoiExtractionConfig,
-)
-# -----------------------------------------------------------------------------
-# Import static connectivity and graph analysis utilities from the new modular
-# ``brainnet.static`` subpackage.  This subpackage defines the
-# ``ConnectivityMatrix`` and ``GraphMetrics`` dataclasses along with the
-# ``StaticAnalyzer`` class, which replaces the legacy ``static_analysis``
-# module.  The old module remains in the repository for backwards
-# compatibility, but new code should import from ``brainnet.static`` instead.
-from .static import (
-    ConnectivityMatrix,
-    GraphMetrics,
-    StaticAnalyzer,
-    compute_pearson_connectivity,
-    compute_degree,
-    compute_clustering,
-    compute_global_efficiency,
-)
-# Import dynamic analysis classes from the new modular package.  The
-# legacy ``dynamic_analysis`` module remains for backwards
-# compatibility but users are encouraged to import from
-# ``brainnet.dynamic`` instead.  See the documentation in
-# ``brainnet.dynamic.__init__`` for details.
-from .dynamic import (
-    DynamicAnalyzer,
-    DynamicConfig,
-    DynamicStateModel,
-    DynamicMetrics,
-)
-from .visualization import ReportConfig, ReportGenerator
+from .data_management import BIDSFile, DatasetIndex, DatasetManager
+
+# The remaining imports are optional and may require additional third‑party
+# dependencies.  They are wrapped in ``try`` blocks so that importing the
+# top‑level package does not fail if those dependencies are absent.  Modules
+# that cannot be imported will simply expose ``None`` placeholders.
+try:  # pragma: no cover - optional dependency chain
+    from .preprocessing import PreprocConfig, Preprocessor, PreprocessedData
+except Exception:  # pragma: no cover
+    PreprocConfig = Preprocessor = PreprocessedData = None
+
+try:  # pragma: no cover - optional dependency chain
+    from .preprocessing_full import (
+        PreprocessPipelineConfig,
+        PreprocessPipeline,
+        SliceTimingConfig,
+        MotionCorrectionConfig,
+        SpatialNormalizationConfig,
+        SmoothingConfig,
+        TemporalFilterConfig,
+        NuisanceRegressionConfig,
+        RoiExtractionConfig,
+    )
+except Exception:  # pragma: no cover
+    (
+        PreprocessPipelineConfig,
+        PreprocessPipeline,
+        SliceTimingConfig,
+        MotionCorrectionConfig,
+        SpatialNormalizationConfig,
+        SmoothingConfig,
+        TemporalFilterConfig,
+        NuisanceRegressionConfig,
+        RoiExtractionConfig,
+    ) = (None,) * 9
+
+try:  # pragma: no cover - optional dependency chain
+    from .static import (
+        ConnectivityMatrix,
+        GraphMetrics,
+        StaticAnalyzer,
+        compute_pearson_connectivity,
+        compute_degree,
+        compute_clustering,
+        compute_global_efficiency,
+    )
+except Exception:  # pragma: no cover
+    (
+        ConnectivityMatrix,
+        GraphMetrics,
+        StaticAnalyzer,
+        compute_pearson_connectivity,
+        compute_degree,
+        compute_clustering,
+        compute_global_efficiency,
+    ) = (None,) * 7
+
+try:  # pragma: no cover - optional dependency chain
+    from .dynamic import (
+        DynamicAnalyzer,
+        DynamicConfig,
+        DynamicStateModel,
+        DynamicMetrics,
+    )
+except Exception:  # pragma: no cover
+    DynamicAnalyzer = DynamicConfig = DynamicStateModel = DynamicMetrics = None
+
+try:  # pragma: no cover - optional dependency chain
+    from .visualization import ReportConfig, ReportGenerator
+except Exception:  # pragma: no cover
+    ReportConfig = ReportGenerator = None
 
 __all__ = [
     'BIDSFile',
     'DatasetIndex',
+    'DatasetManager',
     'PreprocConfig',
     'Preprocessor',
     'PreprocessedData',

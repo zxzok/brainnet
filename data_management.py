@@ -38,8 +38,9 @@ from __future__ import annotations
 
 import os
 import json
+import argparse
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Any
 
 
 @dataclass
@@ -249,7 +250,64 @@ class DatasetIndex:
         return list(self._index[subject][session])
 
 
+class DatasetManager(DatasetIndex):
+    """Extend :class:`DatasetIndex` with basic dataset statistics."""
+
+    def total_subjects(self) -> int:
+        """Return the number of subjects in the dataset."""
+        return len(self._subjects)
+
+    def sessions_per_subject(self) -> Dict[str, int]:
+        """Return a mapping of subject label to session count."""
+        return {sub: len(ses_dict) for sub, ses_dict in self._index.items()}
+
+    def runs_per_session(self) -> Dict[str, Dict[Optional[str], int]]:
+        """Return a nested mapping of subject -> session -> run count."""
+        return {
+            sub: {ses: len(runs) for ses, runs in ses_dict.items()}
+            for sub, ses_dict in self._index.items()
+        }
+
+    def summarize(self) -> Dict[str, Any]:
+        """Summarize dataset composition.
+
+        Returns
+        -------
+        dict
+            Dictionary containing counts of subjects, sessions and runs.
+        """
+
+        return {
+            "total_subjects": self.total_subjects(),
+            "sessions_per_subject": self.sessions_per_subject(),
+            "runs_per_session": self.runs_per_session(),
+        }
+
+
 __all__ = [
     'BIDSFile',
     'DatasetIndex',
+    'DatasetManager',
 ]
+
+
+def main(argv: Optional[List[str]] = None) -> None:
+    """Simple command line interface for dataset management."""
+
+    parser = argparse.ArgumentParser(description="Dataset management utilities")
+    subparsers = parser.add_subparsers(dest="command")
+
+    summary_parser = subparsers.add_parser("summary", help="Summarize a BIDS dataset")
+    summary_parser.add_argument("dataset", help="Path to the dataset root")
+
+    args = parser.parse_args(argv)
+    if args.command == "summary":
+        manager = DatasetManager(args.dataset)
+        summary = manager.summarize()
+        print(json.dumps(summary, indent=2))
+    else:
+        parser.print_help()
+
+
+if __name__ == "__main__":  # pragma: no cover - CLI entry point
+    main()

@@ -5,6 +5,16 @@ patient data, and computed features.
 """
 
 from flask import Flask, render_template, request, jsonify, redirect, url_for
+from flask_login import (
+    LoginManager,
+    login_user,
+    login_required,
+    logout_user,
+    UserMixin,
+    current_user,
+)
+from werkzeug.security import generate_password_hash, check_password_hash
+from functools import wraps
 import os
 import json
 from datetime import datetime
@@ -13,8 +23,13 @@ from pathlib import Path
 
 # Initialize Flask app
 app = Flask(__name__)
+app.secret_key = 'supersecretkey'
 app.config['UPLOAD_FOLDER'] = 'uploads'
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
+
+login_manager = LoginManager()
+login_manager.login_view = 'login'
+login_manager.init_app(app)
 
 # Create upload directory if it doesn't exist
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
@@ -66,6 +81,24 @@ def init_db():
             FOREIGN KEY (image_id) REFERENCES mri_images (id)
         )
     ''')
+
+    # Create users table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            role TEXT NOT NULL DEFAULT 'user'
+        )
+    ''')
+
+    # Create default admin user if none exist
+    cursor.execute('SELECT id FROM users WHERE username = ?', ('admin',))
+    if not cursor.fetchone():
+        cursor.execute(
+            'INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)',
+            ('admin', generate_password_hash('admin'), 'admin'),
+        )
     
     conn.commit()
     conn.close()
@@ -73,8 +106,90 @@ def init_db():
 # Initialize database
 init_db()
 
+
+class User(UserMixin):
+    """Simple User model for authentication."""
+
+    def __init__(self, id, username, password_hash, role):
+        self.id = id
+        self.username = username
+        self.password_hash = password_hash
+        self.role = role
+
+    @staticmethod
+    def get(user_id):
+        conn = sqlite3.connect('brainnet.db')
+        cursor = conn.cursor()
+        cursor.execute(
+            'SELECT id, username, password_hash, role FROM users WHERE id = ?',
+            (user_id,),
+        )
+        row = cursor.fetchone()
+        conn.close()
+        if row:
+            return User(*row)
+        return None
+
+    @staticmethod
+    def get_by_username(username):
+        conn = sqlite3.connect('brainnet.db')
+        cursor = conn.cursor()
+        cursor.execute(
+            'SELECT id, username, password_hash, role FROM users WHERE username = ?',
+            (username,),
+        )
+        row = cursor.fetchone()
+        conn.close()
+        if row:
+            return User(*row)
+        return None
+
+
+@login_manager.user_loader
+def load_user(user_id):
+    return User.get(int(user_id))
+
+
+def admin_required(f):
+    """Decorator to restrict routes to admin users."""
+
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_authenticated or current_user.role != 'admin':
+            return "Forbidden", 403
+        return f(*args, **kwargs)
+
+    return decorated_function
+
+# Authentication routes
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    """User login page."""
+    error = None
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+        user = User.get_by_username(username)
+        if user and check_password_hash(user.password_hash, password):
+            login_user(user)
+            next_page = request.args.get('next')
+            return redirect(next_page or url_for('index'))
+        else:
+            error = 'Invalid credentials'
+    return render_template('login.html', error=error)
+
+
+@app.route('/logout')
+@login_required
+def logout():
+    """Log out the current user."""
+    logout_user()
+    return redirect(url_for('login'))
+
+
 # Routes
 @app.route('/')
+@login_required
 def index():
     """Main page showing all patients."""
     conn = sqlite3.connect('brainnet.db')
@@ -90,6 +205,7 @@ def index():
     return render_template('index.html', patients=patients)
 
 @app.route('/patients')
+@login_required
 def patients():
     """List all patients."""
     conn = sqlite3.connect('brainnet.db')
@@ -105,6 +221,7 @@ def patients():
     return render_template('patients.html', patients=patients)
 
 @app.route('/patient/<int:patient_id>')
+@login_required
 def patient_detail(patient_id):
     """Show details of a specific patient."""
     conn = sqlite3.connect('brainnet.db')
@@ -131,6 +248,7 @@ def patient_detail(patient_id):
         return "Patient not found", 404
 
 @app.route('/add_patient', methods=['GET', 'POST'])
+@login_required
 def add_patient():
     """Add a new patient."""
     if request.method == 'POST':
@@ -158,6 +276,7 @@ def add_patient():
     return render_template('add_patient.html')
 
 @app.route('/edit_patient/<int:patient_id>', methods=['GET', 'POST'])
+@login_required
 def edit_patient(patient_id):
     """Edit an existing patient."""
     conn = sqlite3.connect('brainnet.db')
@@ -188,6 +307,8 @@ def edit_patient(patient_id):
         return "Patient not found", 404
 
 @app.route('/delete_patient/<int:patient_id>', methods=['POST'])
+@login_required
+@admin_required
 def delete_patient(patient_id):
     """Delete a patient."""
     conn = sqlite3.connect('brainnet.db')
@@ -217,6 +338,7 @@ def delete_patient(patient_id):
     return redirect(url_for('patients'))
 
 @app.route('/upload_image/<int:patient_id>', methods=['POST'])
+@login_required
 def upload_image(patient_id):
     """Upload an MRI image for a patient."""
     if 'image' not in request.files:
@@ -250,6 +372,8 @@ def upload_image(patient_id):
     return "Upload failed", 500
 
 @app.route('/delete_image/<int:image_id>', methods=['POST'])
+@login_required
+@admin_required
 def delete_image(image_id):
     """Delete an MRI image."""
     conn = sqlite3.connect('brainnet.db')
@@ -274,6 +398,7 @@ def delete_image(image_id):
     return "Image deleted successfully"
 
 @app.route('/features/<int:image_id>')
+@login_required
 def view_features(image_id):
     """View features for a specific image."""
     conn = sqlite3.connect('brainnet.db')
@@ -396,15 +521,18 @@ def api_search():
 
 # MRI visualization page
 @app.route('/mri')
+@login_required
 def mri_visualization():
     return render_template('mri_visualization.html')
 
 @app.route('/features')
+@login_required
 def features_visualization():
     return render_template('features.html')
 
 # Network visualization page
 @app.route('/network_visualization', methods=['GET'])
+@login_required
 def network_visualization():
     return render_template('network_visualization.html')
 
@@ -434,16 +562,18 @@ if __name__ == '__main__':
 
 # Analysis results page
 @app.route('/analysis')
+@login_required
 def analysis():
     return render_template('analysis.html')
 
 # MRI image gallery page
 @app.route('/gallery')
+@login_required
 def gallery():
     conn = sqlite3.connect('brainnet.db')
     cursor = conn.cursor()
     cursor.execute('''
-        SELECT id, image_path, image_type, acquisition_date, description, created_at 
+        SELECT id, image_path, image_type, acquisition_date, description, created_at
         FROM mri_images 
         ORDER BY created_at DESC
     ''')

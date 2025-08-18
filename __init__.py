@@ -36,7 +36,7 @@ where needed but may not be available in every runtime environment.  If
 these packages are missing the corresponding functionality will not work.
 """
 
-from .data_management import BIDSFile, DatasetIndex
+from .data_management import BIDSFile, DatasetIndex, Patient, DatasetManager
 # Expose the simple and full preprocessing pipelines.  ``PreprocConfig`` and
 # ``Preprocessor`` implement a lightweight pipeline suitable for quick
 # connectivity analyses, whereas ``PreprocessPipelineConfig`` and
@@ -89,6 +89,8 @@ from .templates import Template, load_template, construct_network
 __all__ = [
     'BIDSFile',
     'DatasetIndex',
+    'Patient',
+    'DatasetManager',
     'PreprocConfig',
     'Preprocessor',
     'PreprocessedData',

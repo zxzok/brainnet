@@ -85,14 +85,19 @@ Enable the appropriate methods only after the corresponding software has been in
 ## Dynamic connectivity
 
 The `brainnet.dynamic` module performs sliding-window functional connectivity analyses. For K‑means clustering you can allow
-the library to recommend the number of states via silhouette scores:
+the library to recommend the number of states via silhouette scores, while for Gaussian HMMs the optimal state count can be chosen automatically using information criteria (BIC or AIC):
 
 ```python
 from brainnet.dynamic import DynamicConfig, DynamicAnalyzer
 
+# K-means with automatic K selection
 cfg = DynamicConfig(window_length=30, step=5, auto_n_states=True)
 model = DynamicAnalyzer(cfg).analyse(roi_timeseries)
-print(model.n_states)
+
+# HMM using BIC to choose the number of states
+cfg_hmm = DynamicConfig(window_length=30, step=5, method='hmm', auto_n_states=True, n_states_criterion='bic')
+model_hmm = DynamicAnalyzer(cfg_hmm).analyse(roi_timeseries)
+print(model_hmm.n_states)
 ```
 
 Setting `auto_n_states=True` triggers an internal evaluation of candidate `K` values and overrides `n_states` with the best recommendation.

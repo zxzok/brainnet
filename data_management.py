@@ -10,6 +10,12 @@ stores the path to the imaging file along with parsed metadata.  The
 dataset indexer can retrieve lists of runs and associated metadata for
 subsequent processing.
 
+In addition to the low‑level :class:`DatasetIndex`, a high‑level
+convenience wrapper :class:`DatasetManager` is provided.  It augments the
+index with demographic information loaded from a ``participants.tsv``
+file, exposing helper methods to query patient metadata alongside run
+information.
+
 The implementation focuses on the functional data contained under
 ``func/`` directories in a BIDS dataset.  It supports optional session
 hierarchies (``ses-*``) and will attempt to locate corresponding JSON
@@ -38,6 +44,7 @@ from __future__ import annotations
 
 import os
 import json
+import csv
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 import csv
@@ -290,70 +297,7 @@ class DatasetIndex:
         return list(self._index[subject][session])
 
 
-class DatasetManager(DatasetIndex):
-    """Extend :class:`DatasetIndex` with participant information.
 
-    The manager reads the ``participants.tsv`` file located at the root of
-    the dataset and creates :class:`Patient` instances for each entry.  The
-    resulting mapping is available via the :attr:`patients` attribute.
-    """
-
-    def __init__(self, root: str) -> None:
-        super().__init__(root)
-        self.patients: Dict[str, Patient] = {}
-        self._load_participants()
-
-    # -- participants ------------------------------------------------------
-    def _load_participants(self) -> None:
-        part_path = os.path.join(self.root, "participants.tsv")
-        if not os.path.exists(part_path):
-            return
-        with open(part_path, "r", newline="") as tsvfile:
-            reader = csv.DictReader(tsvfile, delimiter="\t")
-            for row in reader:
-                raw_id = (
-                    row.get("participant_id")
-                    or row.get("id")
-                    or row.get("subject_id")
-                )
-                if not raw_id:
-                    continue
-                pid = raw_id.replace("sub-", "")
-                age_val = row.get("age")
-                try:
-                    age = float(age_val) if age_val not in (None, "") else None
-                except ValueError:
-                    age = None
-                sex = row.get("sex")
-                diagnosis = row.get("diagnosis")
-                extras = {
-                    k: v
-                    for k, v in row.items()
-                    if k
-                    not in {
-                        "participant_id",
-                        "id",
-                        "subject_id",
-                        "age",
-                        "sex",
-                        "diagnosis",
-                    }
-                }
-                self.patients[pid] = Patient(
-                    id=pid,
-                    age=age,
-                    sex=sex,
-                    diagnosis=diagnosis,
-                    attributes=extras,
-                )
-
-    def get_patient(self, subject: str) -> Optional[Patient]:
-        """Retrieve a :class:`Patient` by subject ID."""
-        return self.patients.get(subject)
-
-    def list_patients(self) -> List[Patient]:
-        """Return all loaded patients."""
-        return list(self.patients.values())
 
 
 __all__ = [

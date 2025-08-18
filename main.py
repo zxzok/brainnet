@@ -41,7 +41,9 @@ from pathlib import Path
 
 import numpy as np
 
-from .data_management import DatasetIndex
+from typing import Optional
+
+from .data_management import DatasetIndex, DatasetManager
 # Import both preprocessing pipelines.  The simple Preprocessor is kept for
 # compatibility, but here we demonstrate usage of the more modular
 # PreprocessPipeline.
@@ -127,7 +129,12 @@ def run_pipeline(dataset_path: str, subject: str, task: str, output_dir: str) ->
 
 def parse_args(args: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run brainnet pipeline on a BIDS dataset")
-    parser.add_argument('dataset', type=str, help='Path to BIDS dataset root')
+    parser.add_argument(
+        'dataset', nargs='?', type=str, default=None,
+        help='Path to BIDS dataset root')
+    parser.add_argument(
+        '--openneuro-id', type=str, default=None,
+        help='OpenNeuro dataset identifier (e.g. ds000114)')
     parser.add_argument('--subject', type=str, required=True, help='Subject label (without sub-)')
     parser.add_argument('--task', type=str, required=True, help='Task name (e.g. rest)')
     parser.add_argument('--output', type=str, default='reports', help='Output directory for reports')
@@ -136,7 +143,12 @@ def parse_args(args: list[str]) -> argparse.Namespace:
 
 def main(argv: Optional[list[str]] = None) -> None:
     args = parse_args(argv or [])
-    run_pipeline(args.dataset, args.subject, args.task, args.output)
+    dataset_path = args.dataset
+    if args.openneuro_id:
+        dataset_path = DatasetManager.fetch_from_openneuro(args.openneuro_id)
+    if dataset_path is None:
+        raise SystemExit('Either a dataset path or --openneuro-id must be provided')
+    run_pipeline(dataset_path, args.subject, args.task, args.output)
 
 
 if __name__ == '__main__':

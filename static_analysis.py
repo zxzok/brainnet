@@ -14,8 +14,9 @@ connectivity values and associated ROI labels.  Graph metrics are
 encapsulated in the :class:`GraphMetrics` dataclass.  The
 :class:`StaticAnalyzer` class provides convenience methods to
 compute the connectivity matrix using Pearson correlation and to
-derive graph metrics such as weighted degree, clustering coefficient
-and global efficiency.  Thresholding can be applied to emphasise
+derive graph metrics such as weighted degree, clustering coefficient,
+betweenness centrality, global efficiency, average shortest path
+length and modularity.  Thresholding can be applied to emphasise
 significant connections.
 """
 
@@ -24,6 +25,10 @@ from __future__ import annotations
 import numpy as np
 from dataclasses import dataclass, field
 from typing import Dict, Optional, Sequence
+
+import networkx as nx
+from networkx.algorithms.community import greedy_modularity_communities
+from networkx.algorithms.community.quality import modularity
 
 
 # Re‑export the data classes from the new ``brainnet.static`` package.  The
@@ -150,8 +155,9 @@ class StaticAnalyzer:
 
         This wraps the graph metric functions from ``brainnet.static``.
         The input connectivity matrix is first thresholded (if
-        configured) and then degree, clustering coefficient and global
-        efficiency are computed.  The results are returned in a
+        configured) and then degree, clustering coefficient, betweenness
+        centrality, global efficiency, average shortest path length and
+        modularity are computed.  The results are returned in a
         :class:`GraphMetrics` dataclass.
 
         Parameters
@@ -171,12 +177,27 @@ class StaticAnalyzer:
         degrees = compute_degree(mat)
         clustering = compute_clustering(mat)
         efficiency = compute_global_efficiency(mat)
+
+        # build networkx graph for additional metrics
+        G = nx.from_numpy_array(np.abs(mat))
+        betweenness_dict = nx.betweenness_centrality(G, weight='weight')
+        betweenness = np.array([betweenness_dict[i] for i in range(len(betweenness_dict))])
+        try:
+            avg_shortest_path = nx.average_shortest_path_length(G, weight='weight')
+        except nx.NetworkXError:
+            avg_shortest_path = float('inf')
+        communities = greedy_modularity_communities(G, weight='weight')
+        modularity_val = modularity(G, communities, weight='weight')
+
         node_metrics: Dict[str, np.ndarray] = {
             'degree': degrees,
             'clustering': clustering,
+            'betweenness_centrality': betweenness,
         }
         global_metrics: Dict[str, float] = {
             'global_efficiency': float(efficiency),
+            'average_shortest_path_length': float(avg_shortest_path),
+            'modularity': float(modularity_val),
         }
         return GraphMetrics(node_metrics=node_metrics, global_metrics=global_metrics)
 

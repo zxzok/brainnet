@@ -35,8 +35,10 @@ Overview of the pipeline components
 5. **Spatial smoothing** – Applies a Gaussian filter to each volume
    with a configurable full width at half maximum (FWHM), trading off
    spatial resolution for improved signal to noise ratio.
-6. **Temporal filtering** – Removes slow drifts and high frequency
-   noise from the voxel or ROI time series using a bandpass filter.
+6. **Temporal filtering** – Removes slow drifts and/or high frequency
+   noise from the voxel or ROI time series using a Butterworth
+   high‑pass, low‑pass or band‑pass filter depending on the specified
+   cutoff frequencies.
 7. **Nuisance regression** – Regresses out confounding signals
    (e.g. motion parameters, white matter/CSF averages) using
    ordinary least squares.
@@ -559,7 +561,11 @@ class SmoothingStep(ProcessingStep):
 
 
 class TemporalFilterStep(ProcessingStep):
-    """Apply Butterworth bandpass filter along time axis."""
+    """Apply Butterworth temporal filter along the time axis.
+
+    Depending on which cutoff frequencies are provided this step will
+    perform high‑pass, low‑pass or band‑pass filtering.
+    """
 
     def __init__(self, config: TemporalFilterConfig) -> None:
         self.config = config
@@ -573,11 +579,26 @@ class TemporalFilterStep(ProcessingStep):
             return data, meta
         fs = 1.0 / tr
         nyq = 0.5 * fs
-        low = self.config.low_cut / nyq if self.config.low_cut else 0.0
-        high = self.config.high_cut / nyq if self.config.high_cut else 1.0
-        if low <= 0 and high >= 1:
+        low = self.config.low_cut / nyq if self.config.low_cut else None
+        high = self.config.high_cut / nyq if self.config.high_cut else None
+        if low is not None and not 0 < low < 1:
+            raise ValueError("low_cut must be between 0 and the Nyquist frequency")
+        if high is not None and not 0 < high < 1:
+            raise ValueError("high_cut must be between 0 and the Nyquist frequency")
+        if low is None and high is None:
             return data, meta
-        b, a = butter(self.config.order, [low, high], btype='bandpass', analog=False)
+        if low is not None and high is not None:
+            if low >= high:
+                raise ValueError("low_cut must be less than high_cut when both are specified")
+            btype = "bandpass"
+            wn = [low, high]
+        elif high is not None:
+            btype = "lowpass"
+            wn = high
+        else:
+            btype = "highpass"
+            wn = low
+        b, a = butter(self.config.order, wn, btype=btype, analog=False)
         # reshape to (V,T)
         orig_shape = data.shape
         flat = data.reshape(-1, orig_shape[-1])

@@ -39,7 +39,8 @@ from __future__ import annotations
 import os
 import json
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
+import csv
 
 
 @dataclass
@@ -85,6 +86,46 @@ class BIDSFile:
             f"task={self.task!r}, run={self.run!r}, suffix={self.suffix!r}, "
             f"datatype={self.datatype!r}, path={self.path!r})"
         )
+
+
+@dataclass
+class Patient:
+    """Store basic demographic and diagnostic information for a subject.
+
+    The dataclass captures the most common fields found in a BIDS
+    ``participants.tsv`` file and allows arbitrary additional metadata to
+    be stored in the ``attributes`` dictionary.  Utility methods are
+    provided to assist with serialisation when exporting patient records
+    to other formats.
+    """
+
+    id: str
+    age: Optional[float] = None
+    sex: Optional[str] = None
+    diagnosis: Optional[str] = None
+    attributes: Dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialise the patient to a dictionary."""
+        data = {
+            "id": self.id,
+            "age": self.age,
+            "sex": self.sex,
+            "diagnosis": self.diagnosis,
+        }
+        data.update(self.attributes)
+        return data
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "Patient":
+        """Create a :class:`Patient` instance from a dictionary."""
+        known = {k: data.get(k) for k in ["id", "age", "sex", "diagnosis"]}
+        extras = {
+            k: v
+            for k, v in data.items()
+            if k not in {"id", "age", "sex", "diagnosis"}
+        }
+        return cls(attributes=extras, **known)
 
 
 class DatasetIndex:
@@ -249,7 +290,75 @@ class DatasetIndex:
         return list(self._index[subject][session])
 
 
+class DatasetManager(DatasetIndex):
+    """Extend :class:`DatasetIndex` with participant information.
+
+    The manager reads the ``participants.tsv`` file located at the root of
+    the dataset and creates :class:`Patient` instances for each entry.  The
+    resulting mapping is available via the :attr:`patients` attribute.
+    """
+
+    def __init__(self, root: str) -> None:
+        super().__init__(root)
+        self.patients: Dict[str, Patient] = {}
+        self._load_participants()
+
+    # -- participants ------------------------------------------------------
+    def _load_participants(self) -> None:
+        part_path = os.path.join(self.root, "participants.tsv")
+        if not os.path.exists(part_path):
+            return
+        with open(part_path, "r", newline="") as tsvfile:
+            reader = csv.DictReader(tsvfile, delimiter="\t")
+            for row in reader:
+                raw_id = (
+                    row.get("participant_id")
+                    or row.get("id")
+                    or row.get("subject_id")
+                )
+                if not raw_id:
+                    continue
+                pid = raw_id.replace("sub-", "")
+                age_val = row.get("age")
+                try:
+                    age = float(age_val) if age_val not in (None, "") else None
+                except ValueError:
+                    age = None
+                sex = row.get("sex")
+                diagnosis = row.get("diagnosis")
+                extras = {
+                    k: v
+                    for k, v in row.items()
+                    if k
+                    not in {
+                        "participant_id",
+                        "id",
+                        "subject_id",
+                        "age",
+                        "sex",
+                        "diagnosis",
+                    }
+                }
+                self.patients[pid] = Patient(
+                    id=pid,
+                    age=age,
+                    sex=sex,
+                    diagnosis=diagnosis,
+                    attributes=extras,
+                )
+
+    def get_patient(self, subject: str) -> Optional[Patient]:
+        """Retrieve a :class:`Patient` by subject ID."""
+        return self.patients.get(subject)
+
+    def list_patients(self) -> List[Patient]:
+        """Return all loaded patients."""
+        return list(self.patients.values())
+
+
 __all__ = [
     'BIDSFile',
+    'Patient',
     'DatasetIndex',
+    'DatasetManager',
 ]

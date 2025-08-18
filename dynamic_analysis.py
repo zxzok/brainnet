@@ -193,7 +193,7 @@ class DynamicAnalyzer:
         return windows, np.array(window_metric)
 
     # --------------------------------------------------------------
-    def analyse(self, roi_timeseries: np.ndarray) -> DynamicStateModel:
+    def analyse(self, roi_timeseries: np.ndarray, template: Optional[str] = None) -> DynamicStateModel:
         """Run dynamic connectivity analysis and state identification.
 
         Parameters
@@ -209,16 +209,16 @@ class DynamicAnalyzer:
         """
         method = self.config.method
         if method == 'kmeans':
-            return self._analyse_kmeans(roi_timeseries)
+            return self._analyse_kmeans(roi_timeseries, template)
         elif method == 'hmm':
-            return self._analyse_hmm(roi_timeseries)
+            return self._analyse_hmm(roi_timeseries, template)
         elif method == 'cap':
-            return self._analyse_cap(roi_timeseries)
+            return self._analyse_cap(roi_timeseries, template)
         else:
             raise ValueError(f"Unknown dynamic analysis method '{method}'")
 
     # --------------------------------------------------------------
-    def _analyse_kmeans(self, roi_timeseries: np.ndarray) -> DynamicStateModel:
+    def _analyse_kmeans(self, roi_timeseries: np.ndarray, template: Optional[str]) -> DynamicStateModel:
         windows, window_metric = self._compute_sliding_windows(roi_timeseries)
         if not windows:
             raise ValueError("No windows could be generated; check window_length and data length")
@@ -257,10 +257,11 @@ class DynamicAnalyzer:
             state_sequence=labels,
             metrics=metrics,
             extra=extra,
+            template=template,
         )
 
     # --------------------------------------------------------------
-    def _analyse_hmm(self, roi_timeseries: np.ndarray) -> DynamicStateModel:
+    def _analyse_hmm(self, roi_timeseries: np.ndarray, template: Optional[str]) -> DynamicStateModel:
         T, N = roi_timeseries.shape
         self.config.validate(T)
         if GaussianHMM is None:
@@ -293,10 +294,11 @@ class DynamicAnalyzer:
             state_sequence=hidden_states,
             metrics=metrics,
             extra=extra,
+            template=template,
         )
 
     # --------------------------------------------------------------
-    def _analyse_cap(self, roi_timeseries: np.ndarray) -> DynamicStateModel:
+    def _analyse_cap(self, roi_timeseries: np.ndarray, template: Optional[str]) -> DynamicStateModel:
         # Co‑activation pattern analysis: identify high‑amplitude frames and cluster them
         T, N = roi_timeseries.shape
         # z‑score each ROI time series
@@ -346,6 +348,7 @@ class DynamicAnalyzer:
             state_sequence=seq,
             metrics=metrics,
             extra=extra,
+            template=template,
         )
 
     # --------------------------------------------------------------

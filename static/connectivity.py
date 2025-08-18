@@ -12,7 +12,7 @@ associated ROI labels and metadata about the computation method.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Sequence
+from typing import Sequence, Optional
 
 import numpy as np
 
@@ -33,11 +33,14 @@ class ConnectivityMatrix:
     method : str, optional
         Name of the method used to compute the matrix (e.g. ``'pearson'``).
         Defaults to ``'pearson'``.
+    template : str | None
+        Name of the template/parcellation the matrix corresponds to.
     """
 
     matrix: np.ndarray
     labels: Sequence[str]
     method: str = 'pearson'
+    template: Optional[str] = None
 
     def copy(self) -> 'ConnectivityMatrix':
         """Return a deep copy of the connectivity matrix and labels."""
@@ -47,6 +50,7 @@ class ConnectivityMatrix:
 def compute_pearson_connectivity(
     roi_timeseries: np.ndarray,
     labels: Sequence[str],
+    template: Optional[str] = None,
 ) -> ConnectivityMatrix:
     """Compute a Pearson correlation connectivity matrix for ROI signals.
 
@@ -78,4 +82,4 @@ def compute_pearson_connectivity(
     corr = np.nan_to_num(corr, nan=0.0)
     # zero the diagonal
     np.fill_diagonal(corr, 0.0)
-    return ConnectivityMatrix(matrix=corr, labels=list(labels), method='pearson')
+    return ConnectivityMatrix(matrix=corr, labels=list(labels), method='pearson', template=template)

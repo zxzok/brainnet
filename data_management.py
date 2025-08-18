@@ -46,7 +46,8 @@ import os
 import json
 import csv
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
+import csv
 
 
 @dataclass
@@ -92,6 +93,46 @@ class BIDSFile:
             f"task={self.task!r}, run={self.run!r}, suffix={self.suffix!r}, "
             f"datatype={self.datatype!r}, path={self.path!r})"
         )
+
+
+@dataclass
+class Patient:
+    """Store basic demographic and diagnostic information for a subject.
+
+    The dataclass captures the most common fields found in a BIDS
+    ``participants.tsv`` file and allows arbitrary additional metadata to
+    be stored in the ``attributes`` dictionary.  Utility methods are
+    provided to assist with serialisation when exporting patient records
+    to other formats.
+    """
+
+    id: str
+    age: Optional[float] = None
+    sex: Optional[str] = None
+    diagnosis: Optional[str] = None
+    attributes: Dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialise the patient to a dictionary."""
+        data = {
+            "id": self.id,
+            "age": self.age,
+            "sex": self.sex,
+            "diagnosis": self.diagnosis,
+        }
+        data.update(self.attributes)
+        return data
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "Patient":
+        """Create a :class:`Patient` instance from a dictionary."""
+        known = {k: data.get(k) for k in ["id", "age", "sex", "diagnosis"]}
+        extras = {
+            k: v
+            for k, v in data.items()
+            if k not in {"id", "age", "sex", "diagnosis"}
+        }
+        return cls(attributes=extras, **known)
 
 
 class DatasetIndex:
@@ -256,71 +297,12 @@ class DatasetIndex:
         return list(self._index[subject][session])
 
 
-class DatasetManager:
-    """High‑level helper combining :class:`DatasetIndex` with participant data.
 
-    Upon initialisation the underlying :class:`DatasetIndex` is created and
-    a ``participants.tsv`` file located at the dataset root is parsed if it
-    exists.  Each row in the TSV is mapped to a dictionary of metadata keyed
-    by the subject identifier without the ``sub-`` prefix.
-
-    Parameters
-    ----------
-    root : str
-        Path to the root of the BIDS dataset.
-    """
-
-    def __init__(self, root: str) -> None:
-        self.index = DatasetIndex(root)
-        self._patients: Dict[str, Dict[str, str]] = {}
-        self._load_participants()
-
-    # -- participants -----------------------------------------------------
-    def _load_participants(self) -> None:
-        """Load participant demographics from ``participants.tsv`` if present."""
-        pfile = os.path.join(self.index.root, "participants.tsv")
-        if not os.path.exists(pfile):
-            return
-        with open(pfile, "r", encoding="utf-8") as f:
-            reader = csv.DictReader(f, delimiter="\t")
-            for row in reader:
-                pid = row.get("participant_id")
-                if not pid:
-                    continue
-                subject = pid.replace("sub-", "")
-                meta = {k: v for k, v in row.items() if k != "participant_id"}
-                self._patients[subject] = meta
-
-    # -- accessors --------------------------------------------------------
-    def get_patient(self, subject_id: str) -> Dict[str, str]:
-        """Return metadata for ``subject_id``.
-
-        Parameters
-        ----------
-        subject_id : str
-            Subject identifier with or without ``sub-`` prefix.
-        """
-        sid = subject_id.replace("sub-", "")
-        if sid not in self._patients:
-            raise KeyError(f"Patient {sid} not found in participants.tsv")
-        return self._patients[sid]
-
-    def list_patients(self) -> List[str]:
-        """Return a sorted list of available patient identifiers."""
-        if self._patients:
-            return sorted(self._patients.keys())
-        return self.index.list_subjects()
-
-    def get_runs(
-        self, subject_id: str, session_id: Optional[str] | None = None
-    ) -> List[BIDSFile]:
-        """Delegate to :meth:`DatasetIndex.get_functional_runs`."""
-        sid = subject_id.replace("sub-", "")
-        return self.index.get_functional_runs(sid, session_id)
 
 
 __all__ = [
     'BIDSFile',
+    'Patient',
     'DatasetIndex',
     'DatasetManager',
 ]

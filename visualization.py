@@ -351,17 +351,23 @@ class ReportGenerator:
     def _plot_dynamic_network_features(self, dyn_model: DynamicStateModel) -> str:
         """Generate dynamic brain network visualization using an external tool (e.g. BrainNetViewer).
 
-        This method writes dynamic network extra metrics to a temporary JSON file and calls an
-        external BrainNetViewer tool to generate a visualization image. The resulting image is then
-        embedded into the HTML report.
+        ``dyn_model.extra`` is expected to be a JSON‑serialisable dictionary whose
+        structure is agreed upon by the calling code.  The contents are written to a
+        temporary JSON file which is then consumed by an external BrainNetViewer
+        process.  If ``dyn_model.extra`` is empty, a friendly message is returned
+        instead of attempting the visualisation.
         """
         import tempfile
         import json
         import subprocess
 
+        extra_data = dyn_model.extra
+        if not extra_data:
+            return "<p>No extra dynamic network metrics provided.</p>"
+
         # Write dynamic network extra metrics to a temporary JSON file
         with tempfile.NamedTemporaryFile(delete=False, suffix='.json', dir=self.config.output_dir) as tmp:
-            json.dump(dyn_model.metrics.extra, tmp, indent=2)
+            json.dump(extra_data, tmp, indent=2)
             tmp_path = tmp.name
 
         # Define output image file path

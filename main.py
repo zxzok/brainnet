@@ -38,6 +38,7 @@ from __future__ import annotations
 import argparse
 import os
 from pathlib import Path
+import sqlite3
 
 import numpy as np
 
@@ -68,6 +69,7 @@ from .static import StaticAnalyzer
 # subpackage provides the same interfaces in a more structured way.
 from .dynamic import DynamicConfig, DynamicAnalyzer
 from .visualization import ReportConfig, ReportGenerator
+from .web_app import process_image  # reuse processing helper
 
 
 def run_pipeline(dataset_path: str, subject: str, task: str, output_dir: str) -> None:
@@ -127,6 +129,51 @@ def run_pipeline(dataset_path: str, subject: str, task: str, output_dir: str) ->
     print(f"Report written to {report_path}")
 
 
+def generate_patient_report(patient_id: int, output_dir: str) -> None:
+    """Generate report for a patient stored in the SQLite database."""
+    conn = sqlite3.connect('brainnet.db')
+    cur = conn.cursor()
+    cur.execute('SELECT id, patient_id, name, age, sex FROM patients WHERE id = ?', (patient_id,))
+    patient = cur.fetchone()
+    if not patient:
+        raise SystemExit("Patient not found")
+    cur.execute('SELECT id, image_path FROM mri_images WHERE patient_id = ?', (patient_id,))
+    images = cur.fetchall()
+    if not images:
+        raise SystemExit("No images for patient")
+    for img_id, path in images:
+        cur.execute('SELECT COUNT(*) FROM features WHERE image_id = ?', (img_id,))
+        if cur.fetchone()[0] == 0:
+            process_image(img_id, path)
+    conn.close()
+
+    first_id, first_path = images[0]
+    pipeline = PreprocessPipeline(PreprocessPipelineConfig())
+    preproc = pipeline.run(first_path)
+    roi_ts = preproc.get('roi_timeseries')
+    labels = preproc.get('roi_labels') or []
+    static_analyzer = StaticAnalyzer()
+    conn_matrix = static_analyzer.compute_connectivity(roi_ts, labels)
+    graph_metrics = static_analyzer.compute_graph_metrics(conn_matrix)
+    dyn_cfg = DynamicConfig(window_length=10, step=5, n_states=2)
+    dyn_analyzer = DynamicAnalyzer(dyn_cfg)
+    dyn_model = dyn_analyzer.analyse(roi_ts)
+
+    rep_cfg = ReportConfig(output_dir=output_dir)
+    rep_gen = ReportGenerator(rep_cfg)
+    patient_info = {"Name": patient[2], "Sex": patient[4] or '', "Age": patient[3] or ''}
+    report_path = rep_gen.generate(
+        subject_id=patient[1],
+        conn_matrix=conn_matrix,
+        graph_metrics=graph_metrics,
+        dyn_model=dyn_model,
+        roi_labels=labels,
+        qc_metrics=preproc.get('qc_metrics', {}),
+        patient_info=patient_info,
+    )
+    print(f"Report written to {report_path}")
+
+
 def parse_args(args: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run brainnet pipeline on a BIDS dataset")
     parser.add_argument(
@@ -135,14 +182,20 @@ def parse_args(args: list[str]) -> argparse.Namespace:
     parser.add_argument(
         '--openneuro-id', type=str, default=None,
         help='OpenNeuro dataset identifier (e.g. ds000114)')
-    parser.add_argument('--subject', type=str, required=True, help='Subject label (without sub-)')
-    parser.add_argument('--task', type=str, required=True, help='Task name (e.g. rest)')
+    parser.add_argument('--subject', type=str, help='Subject label (without sub-)')
+    parser.add_argument('--task', type=str, help='Task name (e.g. rest)')
     parser.add_argument('--output', type=str, default='reports', help='Output directory for reports')
+    parser.add_argument('--patient-id', type=int, default=None, help='Generate report for patient in DB')
     return parser.parse_args(args)
 
 
 def main(argv: Optional[list[str]] = None) -> None:
     args = parse_args(argv or [])
+    if args.patient_id is not None:
+        generate_patient_report(args.patient_id, args.output)
+        return
+    if not args.subject or not args.task:
+        raise SystemExit('--subject and --task are required when not using --patient-id')
     dataset_path = args.dataset
     if args.openneuro_id:
         dataset_path = DatasetManager.fetch_from_openneuro(args.openneuro_id)

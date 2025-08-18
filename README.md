@@ -13,6 +13,23 @@ in a single command:
 python -m brainnet.main --openneuro-id ds000114 --subject 01 --task rest
 ```
 
+To generate a report for a patient already stored in the web application's
+database you can call the CLI with ``--patient-id``. The report will include a
+short interpretation produced by an optional Large Language Model (LLM):
+
+```bash
+python -m brainnet.main --patient-id 1
+```
+
+LLM access requires an API key for either OpenAI or a locally available
+transformer model. Set the ``OPENAI_API_KEY`` environment variable or place the
+key in ``~/.openai_api_key``. If no key or model is available the report will
+fall back to a simple rule-based summary.
+
+Within the Flask web interface a **Generate Report** button is available on the
+patient detail page and an equivalent endpoint is exposed at
+``/patient/<patient_id>/report``.
+
 ## Dataset indexing
 
 The :class:`brainnet.data_management.DatasetIndex` helper can enumerate

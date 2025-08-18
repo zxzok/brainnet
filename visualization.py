@@ -59,6 +59,7 @@ except Exception as exc:
 from .static.connectivity import ConnectivityMatrix
 from .static.metrics import GraphMetrics
 from .dynamic.model import DynamicStateModel
+from .llm_interpretation import summarize_analysis
 
 
 @dataclass
@@ -105,6 +106,7 @@ class ReportGenerator:
         dyn_model: DynamicStateModel,
         roi_labels: Sequence[str],
         qc_metrics: Optional[Dict[str, float]] = None,
+        patient_info: Optional[Dict[str, str]] = None,
     ) -> str:
         """Create a report for a single subject and write it to disk.
 
@@ -139,6 +141,11 @@ class ReportGenerator:
         # assemble HTML parts
         sections = []
         sections.append(f"<h1>Subject {html.escape(subject_id)}</h1>")
+        if patient_info:
+            info_lines = [
+                f"<li>{html.escape(k)}: {html.escape(str(v))}</li>" for k, v in patient_info.items()
+            ]
+            sections.append("<h2>Patient Information</h2><ul>" + "".join(info_lines) + "</ul>")
         # QC section
         if self.config.include_qc and qc_metrics:
             qc_lines = [f"<li>{html.escape(name)}: {val:.2f}</li>" for name, val in qc_metrics.items()]
@@ -152,6 +159,13 @@ class ReportGenerator:
         sections.append("<h3>State Timeline</h3>" + self._figure_to_html(self._plot_state_timeline(dyn_model, self.config.time_unit)))
         sections.append("<h3>Transition Matrix</h3>" + self._figure_to_html(self._plot_transition_matrix(dyn_model)))
         sections.append("<h3>State Occupancy</h3>" + self._figure_to_html(self._plot_state_occupancy(dyn_model)))
+
+        # Interpretation via LLM
+        try:
+            interpretation = summarize_analysis(conn_matrix, graph_metrics, dyn_model)
+        except Exception:  # pragma: no cover - best effort
+            interpretation = "Unable to generate interpretation."
+        sections.append(f"<h2>Interpretation</h2><p>{html.escape(interpretation)}</p>")
         
         # Add dynamic brain network visualization section using external software
         sections.append("<h2>Dynamic Brain Network Visualization</h2>" + self._plot_dynamic_network_features(dyn_model))

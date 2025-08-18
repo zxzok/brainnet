@@ -4,7 +4,15 @@ This module provides a Flask-based web interface for managing MRI brain images,
 patient data, and computed features.
 """
 
-from flask import Flask, render_template, request, jsonify, redirect, url_for
+from flask import (
+    Flask,
+    render_template,
+    request,
+    jsonify,
+    redirect,
+    url_for,
+    send_file,
+)
 import os
 import json
 from datetime import datetime
@@ -15,6 +23,7 @@ from concurrent.futures import ThreadPoolExecutor
 from preprocessing_full import PreprocessPipeline, PreprocessPipelineConfig
 from dynamic import DynamicAnalyzer, DynamicConfig
 from static_analysis import StaticAnalyzer
+from visualization import ReportConfig, ReportGenerator
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -185,6 +194,60 @@ def patient_detail(patient_id):
         return render_template('patient_detail.html', patient=patient, images=images)
     else:
         return "Patient not found", 404
+
+
+@app.route('/patient/<int:patient_id>/report')
+def patient_report(patient_id):
+    """Generate and return an HTML report for the patient."""
+    conn = sqlite3.connect('brainnet.db')
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM patients WHERE id = ?', (patient_id,))
+    patient = cursor.fetchone()
+    if not patient:
+        conn.close()
+        return "Patient not found", 404
+    cursor.execute('SELECT id, image_path FROM mri_images WHERE patient_id = ?', (patient_id,))
+    images = cursor.fetchall()
+    conn.close()
+    if not images:
+        return "No images for patient", 404
+
+    # Ensure analysis features exist, run if missing
+    db = sqlite3.connect('brainnet.db')
+    cur = db.cursor()
+    for img_id, path in images:
+        cur.execute('SELECT COUNT(*) FROM features WHERE image_id = ?', (img_id,))
+        if cur.fetchone()[0] == 0:
+            process_image(img_id, path)
+    db.close()
+
+    # Re-run analysis for the first image to obtain objects for report
+    first_id, first_path = images[0]
+    pipeline = PreprocessPipeline(PreprocessPipelineConfig())
+    preproc = pipeline.run(first_path)
+    roi_ts = preproc.get('roi_timeseries')
+    labels = preproc.get('roi_labels') or []
+    static_analyzer = StaticAnalyzer()
+    conn_matrix = static_analyzer.compute_connectivity(roi_ts, labels)
+    graph_metrics = static_analyzer.compute_graph_metrics(conn_matrix)
+    dyn_cfg = DynamicConfig(window_length=10, step=5, n_states=2)
+    dyn_analyzer = DynamicAnalyzer(dyn_cfg)
+    dyn_model = dyn_analyzer.analyse(roi_ts)
+
+    rep_cfg = ReportConfig(output_dir='reports')
+    rep_gen = ReportGenerator(rep_cfg)
+    patient_info = {"Name": patient[2], "Sex": patient[4] or '', "Age": patient[3] or ''}
+    report_path = rep_gen.generate(
+        subject_id=patient[1],
+        conn_matrix=conn_matrix,
+        graph_metrics=graph_metrics,
+        dyn_model=dyn_model,
+        roi_labels=labels,
+        qc_metrics=preproc.get('qc_metrics', {}),
+        patient_info=patient_info,
+    )
+
+    return send_file(report_path)
 
 @app.route('/add_patient', methods=['GET', 'POST'])
 def add_patient():

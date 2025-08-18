@@ -11,6 +11,7 @@ This project provides a modular preprocessing pipeline for functional MRI data. 
 | Spatial normalisation | `fsl` | `flirt` |
 | Spatial normalisation | `ants` | `antsRegistration`, `antsApplyTransforms` |
 | Any SPM based step | `spm` | MATLAB/Octave with SPM on the MATLAB path |
+| Dynamic state features | `networkx` | `networkx` Python package |
 
 ### FSL
 
@@ -32,6 +33,16 @@ This project provides a modular preprocessing pipeline for functional MRI data. 
 
 1. Install [ANTs](https://antsx.github.io/).
 2. Make sure `antsRegistration` and `antsApplyTransforms` are on your `PATH` (e.g., `conda install -c conda-forge ants`).
+
+### Dynamic state features
+
+The dynamic analysis utilities can compute graph metrics such as
+global efficiency and modularity for each connectivity state. These
+features require the optional dependency [`networkx`](https://networkx.org/):
+
+```bash
+pip install networkx
+```
 
 ## Example
 

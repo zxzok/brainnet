@@ -26,6 +26,7 @@ import numpy as np
 from .config import DynamicConfig
 from .model import DynamicStateModel
 from .metrics import compute_state_metrics
+from .state_features import compute_state_features
 
 try:
     from hmmlearn.hmm import GaussianHMM  # type: ignore
@@ -78,14 +79,19 @@ def hmm_analysis(
     hidden_states = hmm.predict(roi_timeseries)
     # Collect state patterns: store mean and covariance for each state
     states: List[dict] = []
+    cov_mats: List[np.ndarray] = []
     for i in range(config.n_states):
         means = hmm.means_[i]
         cov = hmm.covars_[i]
         states.append({'mean': means, 'cov': cov})
+        cov_mats.append(cov)
     # Compute temporal metrics from the hidden state sequence
     metrics = compute_state_metrics(hidden_states, config.n_states)
+    # Derive graph features from the covariance matrices of each state
+    state_features = compute_state_features(cov_mats)
     extra = {
         'hmm': hmm,
+        'state_features': state_features,
     }
     return DynamicStateModel(
         method='hmm',

@@ -56,6 +56,13 @@ from .preprocessing_full import (
     NuisanceRegressionConfig,
     RoiExtractionConfig,
 )
+from .multimodal_preprocessing import (
+    MultimodalPreprocessor,
+    MultimodalPreprocConfig,
+    FMRIPreprocConfig,
+    DWIPreprocConfig,
+    AnatPreprocConfig,
+)
 # -----------------------------------------------------------------------------
 # Import static connectivity and graph analysis utilities from the new modular
 # ``brainnet.static`` subpackage.  This subpackage defines the
@@ -100,6 +107,11 @@ __all__ = [
     'TemporalFilterConfig',
     'NuisanceRegressionConfig',
     'RoiExtractionConfig',
+    'MultimodalPreprocessor',
+    'MultimodalPreprocConfig',
+    'FMRIPreprocConfig',
+    'DWIPreprocConfig',
+    'AnatPreprocConfig',
     'StaticAnalyzer',
     'ConnectivityMatrix',
     'GraphMetrics',

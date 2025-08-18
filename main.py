@@ -45,10 +45,13 @@ from .data_management import DatasetIndex
 # Import both preprocessing pipelines.  The simple Preprocessor is kept for
 # compatibility, but here we demonstrate usage of the more modular
 # PreprocessPipeline.
+# Import both preprocessing pipelines.  The simple Preprocessor is kept for
+# compatibility, but here we demonstrate usage of the more modular
+# PreprocessPipeline.  The multimodal wrapper allows different modalities to be
+# configured together.
 from .preprocessing import PreprocConfig, Preprocessor
 from .preprocessing_full import (
     PreprocessPipelineConfig,
-    PreprocessPipeline,
     SliceTimingConfig,
     MotionCorrectionConfig,
     SpatialNormalizationConfig,
@@ -56,6 +59,13 @@ from .preprocessing_full import (
     TemporalFilterConfig,
     NuisanceRegressionConfig,
     RoiExtractionConfig,
+)
+from .multimodal_preprocessing import (
+    MultimodalPreprocessor,
+    MultimodalPreprocConfig,
+    FMRIPreprocConfig,
+    DWIPreprocConfig,
+    AnatPreprocConfig,
 )
 # Import the StaticAnalyzer from the modular static package instead of the
 # legacy ``static_analysis`` module.  The legacy module remains for
@@ -76,13 +86,12 @@ def run_pipeline(dataset_path: str, subject: str, task: str, output_dir: str) ->
     if not runs:
         raise ValueError(f"No runs found for subject {subject}, task {task}")
     run = runs[0]
-    # ---------------------------------------------------------------------
-    # Configure and execute the preprocessing pipeline.  This example uses
-    # the extensible ``PreprocessPipeline`` with individual step configs.  If
-    # you prefer the simpler pipeline, replace this block with construction
-    # of ``PreprocConfig`` and ``Preprocessor`` as before.
-    # Slice timing and spatial normalisation are disabled by default here.
-    pre_cfg = PreprocessPipelineConfig(
+    # ------------------------------------------------------------------
+    # Configure and execute the multimodal preprocessing.  Here we
+    # enable only the fMRI branch and demonstrate how other modalities
+    # could be configured.  Slice timing and spatial normalisation are
+    # disabled by default.
+    fmri_cfg = PreprocessPipelineConfig(
         slice_timing=SliceTimingConfig(enabled=False),
         motion=MotionCorrectionConfig(enabled=False),
         spatial_norm=SpatialNormalizationConfig(enabled=False),
@@ -92,8 +101,14 @@ def run_pipeline(dataset_path: str, subject: str, task: str, output_dir: str) ->
         roi_extraction=RoiExtractionConfig(enabled=True, atlas_path=None),  # set atlas_path
         retain_4d=False,
     )
-    preproc = PreprocessPipeline(pre_cfg)
-    outputs = preproc.run(run.path)
+    multi_cfg = MultimodalPreprocConfig(
+        t1=AnatPreprocConfig(enabled=False),
+        t2=AnatPreprocConfig(enabled=False),
+        dwi=DWIPreprocConfig(enabled=False),
+        fmri=FMRIPreprocConfig(enabled=True, pipeline=fmri_cfg),
+    )
+    multi_preproc = MultimodalPreprocessor(multi_cfg)
+    outputs = multi_preproc.run_fmri_preproc(run.path)
     roi_ts = outputs.get('roi_timeseries')
     if roi_ts is None:
         raise RuntimeError("ROI extraction failed; check atlas path")

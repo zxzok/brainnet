@@ -1,5 +1,6 @@
 import os
 import sys
+import json
 from pathlib import Path
 
 # Ensure package import path
@@ -17,26 +18,41 @@ def _touch(path: os.PathLike) -> None:
 
 def test_index_anatomical_files(tmp_path):
     dataset = tmp_path / "bids"
-    anat_file = dataset / "sub-01" / "anat" / "sub-01_T1w.nii.gz"
+    anat_dir = dataset / "sub-01" / "anat"
+    anat_file = anat_dir / "sub-01_acq-highres_T1w.nii.gz"
     _touch(anat_file)
+    json_file = Path(str(anat_file).replace(".nii.gz", ".json").replace(".nii", ".json"))
+    with open(json_file, "w") as f:
+        json.dump({"FlipAngle": 7}, f)
 
-    index = DatasetIndex(str(dataset), datatypes=["anat"])
+    index = DatasetIndex(str(dataset), datatypes="anat")
     files = index.get_files("anat", "01")
 
     assert len(files) == 1
-    assert files[0].datatype == "anat"
-    assert files[0].suffix == "T1w"
+    f = files[0]
+    assert f.datatype == "anat"
+    assert f.suffix == "T1w"
+    assert f.metadata["acq"] == "highres"
+    assert f.metadata["FlipAngle"] == 7
 
 
 def test_index_diffusion_files(tmp_path):
     dataset = tmp_path / "bids"
-    dwi_file = dataset / "sub-01" / "dwi" / "sub-01_dwi.nii.gz"
+    dwi_dir = dataset / "sub-01" / "dwi"
+    dwi_file = dwi_dir / "sub-01_dir-AP_run-1_dwi.nii.gz"
     _touch(dwi_file)
+    json_file = Path(str(dwi_file).replace(".nii.gz", ".json").replace(".nii", ".json"))
+    with open(json_file, "w") as f:
+        json.dump({"PhaseEncodingDirection": "j-"}, f)
 
     index = DatasetIndex(str(dataset), datatypes=["dwi"])
     files = index.get_files("dwi", "01")
 
     assert len(files) == 1
-    assert files[0].datatype == "dwi"
-    assert files[0].suffix == "dwi"
+    f = files[0]
+    assert f.datatype == "dwi"
+    assert f.suffix == "dwi"
+    assert f.run == "1"
+    assert f.metadata["dir"] == "AP"
+    assert f.metadata["PhaseEncodingDirection"] == "j-"
 

@@ -16,25 +16,29 @@ index with demographic information loaded from a ``participants.tsv``
 file, exposing helper methods to query patient metadata alongside run
 information.
 
-The implementation focuses on the functional data contained under
-``func/`` directories in a BIDS dataset. It supports optional session
-hierarchies (``ses-*``) and will attempt to locate corresponding JSON
-sidecar files containing sequence parameters. Additional datatypes (such
-as ``anat`` or ``dwi``) could be added by extending the
-``_discover_files`` method.
+The implementation supports common BIDS datatypes such as ``func``,
+``anat`` and ``dwi``. It handles optional session hierarchies
+(``ses-*``) and will attempt to locate corresponding JSON sidecar files
+containing sequence parameters. Metadata embedded in file names (e.g.
+``task-rest`` or ``dir-AP``) are also parsed and exposed on each
+returned :class:`BIDSFile` instance.
 
 Example
 -------
 >>> from brainnet.data_management import DatasetIndex
->>> index = DatasetIndex('/path/to/bids_dataset', datatypes=['func', 'anat'])
+>>> index = DatasetIndex('/path/to/bids_dataset', datatypes=['func', 'anat', 'dwi'])
 >>> subjects = index.list_subjects()
 >>> runs = index.get_functional_runs(subjects[0])
->>> t1w = index.get_files(subjects[0], datatype='anat')
+>>> t1w = index.get_files('anat', subjects[0])
+>>> dwi = index.get_files('dwi', subjects[0])
 >>> for run in runs:
 ...     print(run.path, run.metadata.get('RepetitionTime'))
 
 >>> for img in t1w:
 ...     print(img.path, img.suffix)
+
+>>> for img in dwi:
+...     print(img.path, img.metadata.get('dir'))
 
 Note
 ----
@@ -51,7 +55,7 @@ import json
 import logging
 import os
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Sequence
 
 logger = logging.getLogger(__name__)
 
@@ -130,14 +134,32 @@ def parse_participants_tsv(path: str) -> Dict[str, Patient]:
 
 
 class DatasetIndex:
-    """Index a BIDS‑like dataset."""
+    """Index a BIDS‑like dataset.
 
-    def __init__(self, root: str, datatypes: Optional[List[str]] | None = None) -> None:
+    Parameters
+    ----------
+    root:
+        Path to the dataset root.
+    datatypes:
+        BIDS datatypes to index. May be a string or a sequence of
+        strings, e.g. ``"anat"`` or ``["func", "dwi"]``. If omitted, only
+        functional data are indexed.
+    """
+
+    def __init__(
+        self, root: str, datatypes: Optional[Sequence[str] | str] | None = None
+    ) -> None:
         self.root = os.path.abspath(root)
         if not os.path.exists(self.root):
             raise FileNotFoundError(f"Dataset path does not exist: {self.root}")
 
-        self.datatypes = datatypes or ["func"]
+        if datatypes is None:
+            self.datatypes = ["func"]
+        elif isinstance(datatypes, str):
+            self.datatypes = [datatypes]
+        else:
+            self.datatypes = list(datatypes)
+
         self._subjects: List[str] = []
         self._index: Dict[str, Dict[Optional[str], List[BIDSFile]]] = {}
         self._parse_dataset()
@@ -171,7 +193,7 @@ class DatasetIndex:
         subject: str,
         session: Optional[str],
         base_path: str,
-        datatypes: Optional[List[str]] | None = None,
+        datatypes: Optional[Sequence[str]] | None = None,
     ) -> None:
         """Populate index with imaging files located under ``base_path``."""
 
@@ -187,27 +209,29 @@ class DatasetIndex:
                 if name.endswith(".nii"):
                     name, _ = os.path.splitext(name)
                 tokens = name.split("_")
-                task = run = suffix = None
+                suffix = None
+                entities: Dict[str, str] = {}
                 for tok in tokens:
-                    if tok.startswith("task-"):
-                        task = tok[len("task-") :]
-                    elif tok.startswith("run-"):
-                        run = tok[len("run-") :]
-                    elif tok.startswith("sub-") or tok.startswith("ses-"):
+                    if tok.startswith("sub-") or tok.startswith("ses-"):
                         continue
+                    if "-" in tok:
+                        key, value = tok.split("-", 1)
+                        entities[key] = value
                     else:
                         suffix = tok
                 if suffix is None:
                     suffix = "bold" if dtype == "func" else dtype
+                task = entities.get("task")
+                run = entities.get("run")
                 fpath = os.path.join(dtype_dir, fname)
                 json_path = fpath.replace(".nii.gz", ".json").replace(".nii", ".json")
-                metadata: Dict = {}
+                metadata: Dict[str, str] = dict(entities)
                 if os.path.exists(json_path):
                     try:
                         with open(json_path, "r") as jf:
-                            metadata = json.load(jf)
+                            metadata.update(json.load(jf))
                     except Exception:  # pragma: no cover - best effort
-                        metadata = {}
+                        metadata = dict(entities)
                 bids_file = BIDSFile(
                     subject=subject,
                     session=session,

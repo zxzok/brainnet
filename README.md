@@ -51,3 +51,18 @@ outputs = pipe.run('func.nii.gz')
 ```
 
 Enable the appropriate methods only after the corresponding software has been installed and configured.
+
+## Dynamic connectivity
+
+The `brainnet.dynamic` module performs sliding-window functional connectivity analyses. For K‑means clustering you can allow
+the library to recommend the number of states via silhouette scores:
+
+```python
+from brainnet.dynamic import DynamicConfig, DynamicAnalyzer
+
+cfg = DynamicConfig(window_length=30, step=5, auto_n_states=True)
+model = DynamicAnalyzer(cfg).analyse(roi_timeseries)
+print(model.n_states)
+```
+
+Setting `auto_n_states=True` triggers an internal evaluation of candidate `K` values and overrides `n_states` with the best recommendation.

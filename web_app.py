@@ -10,11 +10,19 @@ import json
 from datetime import datetime
 import sqlite3
 from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor
+
+from preprocessing_full import PreprocessPipeline, PreprocessPipelineConfig
+from dynamic import DynamicAnalyzer, DynamicConfig
+from static_analysis import StaticAnalyzer
 
 # Initialize Flask app
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'uploads'
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
+
+# Background executor for long-running analysis tasks
+executor = ThreadPoolExecutor(max_workers=2)
 
 # Create upload directory if it doesn't exist
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
@@ -72,6 +80,54 @@ def init_db():
 
 # Initialize database
 init_db()
+
+
+def process_image(image_id: int, filepath: str) -> None:
+    """Run preprocessing and analysis pipelines for an uploaded image.
+
+    Results are stored in the ``features`` table.  Any exceptions are
+    caught and logged as an ``error`` feature to aid debugging.
+    """
+    try:
+        pipeline = PreprocessPipeline(PreprocessPipelineConfig())
+        preproc = pipeline.run(filepath)
+        roi_ts = preproc.get('roi_timeseries')
+        labels = preproc.get('roi_labels') or []
+
+        if roi_ts is None or not len(labels):
+            raise ValueError('Preprocessing produced no ROI time series')
+
+        static_analyzer = StaticAnalyzer()
+        conn_matrix = static_analyzer.compute_connectivity(roi_ts, labels)
+        graph_metrics = static_analyzer.compute_graph_metrics(conn_matrix)
+
+        dyn_cfg = DynamicConfig(window_length=10, step=5, n_states=2)
+        dyn_analyzer = DynamicAnalyzer(dyn_cfg)
+        dyn_result = dyn_analyzer.analyse(roi_ts)
+
+        db = sqlite3.connect('brainnet.db')
+        cur = db.cursor()
+        for name, value in graph_metrics.global_metrics.items():
+            cur.execute(
+                'INSERT INTO features (image_id, feature_name, feature_value, feature_type) VALUES (?, ?, ?, ?)',
+                (image_id, name, float(value), 'static'),
+            )
+        for idx, occ in enumerate(dyn_result.metrics.occupancy):
+            cur.execute(
+                'INSERT INTO features (image_id, feature_name, feature_value, feature_type) VALUES (?, ?, ?, ?)',
+                (image_id, f"state_{idx}_occupancy", float(occ), 'dynamic'),
+            )
+        db.commit()
+        db.close()
+    except Exception as exc:  # pragma: no cover - best effort logging
+        db = sqlite3.connect('brainnet.db')
+        cur = db.cursor()
+        cur.execute(
+            'INSERT INTO features (image_id, feature_name, feature_value, feature_type) VALUES (?, ?, ?, ?)',
+            (image_id, 'error', 0.0, str(exc)),
+        )
+        db.commit()
+        db.close()
 
 # Routes
 @app.route('/')
@@ -225,28 +281,35 @@ def upload_image(patient_id):
     file = request.files['image']
     if file.filename == '':
         return "No file selected", 400
-    
+
     if file:
         # Save the file
         filename = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{file.filename}"
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        file.save(filepath)
-        
-        image_type = request.form.get('image_type', 'unknown')
-        description = request.form.get('description', '')
-        
-        conn = sqlite3.connect('brainnet.db')
-        cursor = conn.cursor()
-        
-        cursor.execute('''
-            INSERT INTO mri_images (patient_id, image_path, image_type, description)
-            VALUES (?, ?, ?, ?)
-        ''', (patient_id, filepath, image_type, description))
-        conn.commit()
-        conn.close()
-        
-        return redirect(url_for('patient_detail', patient_id=patient_id))
-    
+        try:
+            file.save(filepath)
+
+            image_type = request.form.get('image_type', 'unknown')
+            description = request.form.get('description', '')
+
+            conn = sqlite3.connect('brainnet.db')
+            cursor = conn.cursor()
+
+            cursor.execute('''
+                INSERT INTO mri_images (patient_id, image_path, image_type, description)
+                VALUES (?, ?, ?, ?)
+            ''', (patient_id, filepath, image_type, description))
+            image_id = cursor.lastrowid
+            conn.commit()
+            conn.close()
+
+            # kick off analysis in the background to avoid blocking
+            executor.submit(process_image, image_id, filepath)
+
+            return redirect(url_for('patient_detail', patient_id=patient_id))
+        except Exception as exc:
+            return f"Upload failed: {exc}", 500
+
     return "Upload failed", 500
 
 @app.route('/delete_image/<int:image_id>', methods=['POST'])

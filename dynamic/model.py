@@ -26,7 +26,7 @@ multiple analysis routines implemented in other submodules.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 
@@ -90,6 +90,9 @@ class DynamicStateModel:
         information (e.g. raw window matrices, HMM objects, event
         indices).  Consumers should consult the documentation of
         individual analysis functions for details on possible keys.
+    template : str | None
+        Name of the template/parcellation used for ROI extraction, if
+        applicable.
     """
 
     method: str
@@ -98,3 +101,4 @@ class DynamicStateModel:
     state_sequence: np.ndarray
     metrics: DynamicMetrics
     extra: Dict[str, Any] = field(default_factory=dict)
+    template: Optional[str] = None

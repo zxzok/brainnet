@@ -36,7 +36,7 @@ where needed but may not be available in every runtime environment.  If
 these packages are missing the corresponding functionality will not work.
 """
 
-from .data_management import BIDSFile, DatasetIndex
+
 # Expose the simple and full preprocessing pipelines.  ``PreprocConfig`` and
 # ``Preprocessor`` implement a lightweight pipeline suitable for quick
 # connectivity analyses, whereas ``PreprocessPipelineConfig`` and
@@ -85,9 +85,11 @@ from .dynamic import (
 )
 from .visualization import ReportConfig, ReportGenerator
 
+
 __all__ = [
     'BIDSFile',
     'DatasetIndex',
+    'DatasetManager',
     'PreprocConfig',
     'Preprocessor',
     'PreprocessedData',
@@ -109,4 +111,5 @@ __all__ = [
     'DynamicMetrics',
     'ReportConfig',
     'ReportGenerator',
+
 ]

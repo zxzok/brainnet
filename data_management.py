@@ -45,9 +45,22 @@ from __future__ import annotations
 import os
 import json
 import csv
+
+import logging
+
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 import csv
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class Patient:
+    """Representation of a single participant and optional metadata."""
+
+    participant_id: str
+    data: Dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -95,6 +108,33 @@ class BIDSFile:
         )
 
 
+
+def parse_participants_tsv(path: str) -> Dict[str, Patient]:
+    """Parse a BIDS ``participants.tsv`` file into :class:`Patient` objects.
+
+    Parameters
+    ----------
+    path : str
+        Path to the ``participants.tsv`` file.
+
+    Returns
+    -------
+    Dict[str, Patient]
+        Mapping of participant IDs to :class:`Patient` instances.
+    """
+
+    participants: Dict[str, Patient] = {}
+    with open(path, newline="") as f:
+        reader = csv.DictReader(f, delimiter="\t")
+        for row in reader:
+            pid = row.get("participant_id")
+            if not pid:
+                logger.error("Row missing participant_id: %s", row)
+                raise ValueError("participant_id is required in participants.tsv")
+            data = {k: v for k, v in row.items() if k != "participant_id" and v != ""}
+            participants[pid] = Patient(participant_id=pid, data=data)
+    return participants
+=======
 @dataclass
 class Patient:
     """Store basic demographic and diagnostic information for a subject.
@@ -133,6 +173,7 @@ class Patient:
             if k not in {"id", "age", "sex", "diagnosis"}
         }
         return cls(attributes=extras, **known)
+
 
 
 class DatasetIndex:
@@ -295,9 +336,30 @@ class DatasetIndex:
 
 
 
+class DatasetManager:
+    """Combine dataset indexing with participant metadata parsing."""
+
+    def __init__(self, root: str) -> None:
+        self.root = os.path.abspath(root)
+        self.index = DatasetIndex(self.root)
+        self.patients: Dict[str, Patient] = {}
+        participants_path = os.path.join(self.root, "participants.tsv")
+        if os.path.exists(participants_path):
+            try:
+                self.patients = parse_participants_tsv(participants_path)
+            except Exception as exc:  # pragma: no cover - logging side effect
+                logger.error("Failed to parse participants.tsv: %s", exc)
+        else:  # pragma: no cover - logging side effect
+            logger.warning("participants.tsv not found at %s", participants_path)
+
+
 __all__ = [
     'BIDSFile',
     'Patient',
     'DatasetIndex',
+
+    'Patient',
     'DatasetManager',
+    'parse_participants_tsv',
+
 ]

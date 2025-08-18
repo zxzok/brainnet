@@ -25,9 +25,10 @@ Preprocessing proceeds in the following stages:
    spatial dimensions (x, y, z) of each volume.  The full width at
    half maximum (FWHM) parameter is converted to a standard deviation
    and used with :func:`scipy.ndimage.gaussian_filter`.
-3. **Temporal filtering** – Optional Butterworth bandpass filtering of
-   the time series along the final dimension.  This removes slow
-   drifts and high frequency noise.
+3. **Temporal filtering** – Optional Butterworth filtering of the time
+   series along the final dimension.  Depending on the supplied cutoff
+   frequencies this may be configured as a high‑pass, low‑pass or
+   band‑pass filter to remove slow drifts and/or high frequency noise.
 4. **Nuisance regression** – Optional removal of confounding
    regressors (e.g. motion parameters) using ordinary least squares.
 5. **ROI extraction** – If configured, compute mean time courses for
@@ -73,16 +74,16 @@ class PreprocConfig:
         Full width at half maximum (in voxels) for spatial Gaussian
         smoothing.  If ``None`` no smoothing is applied.
     low_cut : float | None
-        Low frequency cutoff (Hz) for bandpass filtering.  Frequencies
-        below this value will be attenuated.  If ``None``, no high‑pass
-        filter is applied.
+        Low frequency cutoff (Hz) for high‑pass or band‑pass filtering.
+        Frequencies below this value will be attenuated.  If ``None``,
+        no high‑pass component is applied.
     high_cut : float | None
-        High frequency cutoff (Hz) for bandpass filtering.  Frequencies
-        above this value will be attenuated.  If ``None``, no low‑pass
-        filter is applied.
+        High frequency cutoff (Hz) for low‑pass or band‑pass filtering.
+        Frequencies above this value will be attenuated.  If ``None``,
+        no low‑pass component is applied.
     filter_order : int
-        Order of the Butterworth bandpass filter.  A second‑order filter
-        provides a reasonable compromise between roll‑off and ripple.
+        Order of the Butterworth filter.  A second‑order filter provides
+        a reasonable compromise between roll‑off and ripple.
     confound_columns : List[str] | None
         List of column names to select from a confounds TSV/CSV file.
         These regressors will be regressed out of the data.  If
@@ -128,7 +129,7 @@ class PreprocConfig:
             )
         if self.low_cut is not None and self.high_cut is not None:
             if self.low_cut >= self.high_cut:
-                raise ValueError("low_cut must be less than high_cut for bandpass filtering")
+                raise ValueError("low_cut must be less than high_cut when both are specified")
 
 
 @dataclass
@@ -286,13 +287,27 @@ class Preprocessor:
                 )
             fs = 1.0 / tr
             nyq = 0.5 * fs
-            low = self.config.low_cut / nyq if self.config.low_cut else 0.0
-            high = self.config.high_cut / nyq if self.config.high_cut else 1.0
-            if low <= 0 and high >= 1:
-                # no filtering
+            low = self.config.low_cut / nyq if self.config.low_cut else None
+            high = self.config.high_cut / nyq if self.config.high_cut else None
+            # validate normalised frequencies
+            if low is not None and not 0 < low < 1:
+                raise ValueError("low_cut must be between 0 and the Nyquist frequency")
+            if high is not None and not 0 < high < 1:
+                raise ValueError("high_cut must be between 0 and the Nyquist frequency")
+            if low is None and high is None:
+                # no filtering requested
                 pass
             else:
-                b, a = butter(self.config.filter_order, [low, high], btype='bandpass', analog=False)
+                if low is not None and high is not None:
+                    btype = "bandpass"
+                    wn = [low, high]
+                elif high is not None:
+                    btype = "lowpass"
+                    wn = high
+                else:
+                    btype = "highpass"
+                    wn = low
+                b, a = butter(self.config.filter_order, wn, btype=btype, analog=False)
                 # apply filter along time axis for each voxel
                 orig_shape = data.shape
                 n_voxels = np.prod(orig_shape[:-1])

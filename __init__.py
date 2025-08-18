@@ -84,7 +84,7 @@ from .dynamic import (
     DynamicMetrics,
 )
 from .visualization import ReportConfig, ReportGenerator
-from .templates import Template, load_template, construct_network
+
 
 __all__ = [
     'BIDSFile',
@@ -111,7 +111,5 @@ __all__ = [
     'DynamicMetrics',
     'ReportConfig',
     'ReportGenerator',
-    'Template',
-    'load_template',
-    'construct_network',
+
 ]

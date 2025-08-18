@@ -68,6 +68,7 @@ class StaticAnalyzer:
         roi_timeseries: np.ndarray,
         labels: Sequence[str],
         method: str = 'pearson',
+        template: Optional[str] = None,
     ) -> ConnectivityMatrix:
         """Compute a static functional connectivity matrix.
 
@@ -92,7 +93,7 @@ class StaticAnalyzer:
         """
         if method != 'pearson':
             raise NotImplementedError(f"Connectivity method '{method}' is not implemented")
-        return compute_pearson_connectivity(roi_timeseries, labels)
+        return compute_pearson_connectivity(roi_timeseries, labels, template=template)
 
     # -- thresholding ----------------------------------------------------
     def _apply_threshold(self, matrix: np.ndarray) -> np.ndarray:

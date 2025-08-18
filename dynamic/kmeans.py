@@ -28,7 +28,7 @@ function to work.
 
 from __future__ import annotations
 
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 
 import numpy as np
 from sklearn.cluster import KMeans
@@ -65,7 +65,9 @@ def _flatten_upper_triangle(matrices: List[np.ndarray]) -> Tuple[np.ndarray, Tup
     return features, iu
 
 
-def kmeans_analysis(roi_timeseries: np.ndarray, config: DynamicConfig) -> DynamicStateModel:
+def kmeans_analysis(
+    roi_timeseries: np.ndarray, config: DynamicConfig, template: Optional[str] = None
+) -> DynamicStateModel:
     """Perform dynamic connectivity analysis using K‑means clustering.
 
     Parameters
@@ -128,6 +130,7 @@ def kmeans_analysis(roi_timeseries: np.ndarray, config: DynamicConfig) -> Dynami
         state_sequence=np.array(labels, dtype=int),
         metrics=metrics,
         extra=extra,
+        template=template,
     )
 
 

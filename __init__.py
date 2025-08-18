@@ -72,6 +72,7 @@ except Exception:  # pragma: no cover
         RoiExtractionConfig,
     ) = (None,) * 9
 
+
 # -----------------------------------------------------------------------------
 try:  # pragma: no cover
     from .static import (
@@ -110,9 +111,11 @@ try:  # pragma: no cover
 except Exception:  # pragma: no cover
     ReportConfig = ReportGenerator = None
 
+
 __all__ = [
     'BIDSFile',
     'DatasetIndex',
+    'DatasetManager',
     'PreprocConfig',
     'Preprocessor',
     'PreprocessedData',
@@ -134,4 +137,5 @@ __all__ = [
     'DynamicMetrics',
     'ReportConfig',
     'ReportGenerator',
+
 ]

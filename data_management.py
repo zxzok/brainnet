@@ -57,6 +57,15 @@ import os
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Sequence
 
+try:  # pragma: no cover - optional dependency
+    import openneuro as openneuro_client  # type: ignore
+
+    # Older versions expose ``download`` only; normalise to ``download_dataset``
+    if not hasattr(openneuro_client, "download_dataset"):
+        openneuro_client.download_dataset = openneuro_client.download  # type: ignore[attr-defined]
+except Exception:  # pragma: no cover - handled gracefully at runtime
+    openneuro_client = None
+
 logger = logging.getLogger(__name__)
 
 
@@ -139,19 +148,42 @@ class DatasetIndex:
     Parameters
     ----------
     root:
-        Path to the dataset root.
+        Path to the dataset root. When ``source='openneuro'`` this should
+        instead be an OpenNeuro dataset identifier (e.g. ``'ds000001'``).
     datatypes:
         BIDS datatypes to index. May be a string or a sequence of
         strings, e.g. ``"anat"`` or ``["func", "dwi"]``. If omitted, only
         functional data are indexed.
+    source:
+        Optional data source identifier. If set to ``'openneuro'`` the
+        dataset will be downloaded via :func:`openneuro_client.download_dataset`
+        into a local cache (``~/.cache/openneuro``) unless it already exists.
+
+    Examples
+    --------
+    >>> DatasetIndex('ds000001', source='openneuro')
     """
 
     def __init__(
-        self, root: str, datatypes: Optional[Sequence[str] | str] | None = None
+        self,
+        root: str,
+        datatypes: Optional[Sequence[str] | str] | None = None,
+        source: Optional[str] | None = None,
     ) -> None:
-        self.root = os.path.abspath(root)
-        if not os.path.exists(self.root):
-            raise FileNotFoundError(f"Dataset path does not exist: {self.root}")
+        if source == "openneuro":
+            if openneuro_client is None:
+                raise RuntimeError("openneuro_client is required for source='openneuro'")
+            dataset_id = root
+            cache_base = os.path.join(os.path.expanduser("~"), ".cache", "openneuro")
+            dataset_path = os.path.join(cache_base, dataset_id)
+            if not os.path.exists(dataset_path):
+                os.makedirs(cache_base, exist_ok=True)
+                openneuro_client.download_dataset(dataset=dataset_id, target_dir=cache_base)
+            self.root = os.path.abspath(dataset_path)
+        else:
+            self.root = os.path.abspath(root)
+            if not os.path.exists(self.root):
+                raise FileNotFoundError(f"Dataset path does not exist: {self.root}")
 
         if datatypes is None:
             self.datatypes = ["func"]
@@ -289,7 +321,11 @@ class DatasetIndex:
 
 
 class DatasetManager:
-    """Combine dataset indexing with participant metadata parsing."""
+    """Combine dataset indexing with participant metadata parsing.
+
+    Use :meth:`fetch_from_openneuro` to construct an instance directly from
+    an OpenNeuro dataset identifier.
+    """
 
     def __init__(self, root: str) -> None:
         self.root = os.path.abspath(root)
@@ -303,6 +339,46 @@ class DatasetManager:
                 logger.error("Failed to parse participants.tsv: %s", exc)
         else:  # pragma: no cover - logging side effect
             logger.warning("participants.tsv not found at %s", participants_path)
+
+
+    @staticmethod
+    def fetch_from_openneuro(dataset_id: str, target_dir: str | None = None) -> str:
+        """Download a dataset from OpenNeuro and return the local path.
+
+
+        Parameters
+        ----------
+        dataset_id:
+
+            The OpenNeuro dataset identifier (e.g. ``ds000114``).
+        target_dir:
+            Directory where the dataset should be stored. If omitted, a
+            directory named after ``dataset_id`` in the current working
+            directory will be used.
+
+        Returns
+        -------
+        str
+            Absolute path to the downloaded dataset root.
+
+        Raises
+        ------
+        RuntimeError
+            If the optional ``openneuro`` dependency is not available.
+        """
+
+        try:  # pragma: no cover - external dependency
+            import openneuro
+        except ImportError as exc:  # pragma: no cover - informative error
+            raise RuntimeError(
+                "The 'openneuro' package is required to fetch datasets"
+            ) from exc
+
+        target_dir = os.path.abspath(target_dir or dataset_id)
+        # The openneuro library exposes a convenience download function.
+        openneuro.download(dataset=dataset_id, target_dir=target_dir)
+        return target_dir
+
 
 
 __all__ = [

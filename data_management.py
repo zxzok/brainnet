@@ -52,11 +52,24 @@ from __future__ import annotations
 import os
 import json
 import csv
+
+import logging
+
 from dataclasses import dataclass, field
 
 
 from typing import Any, Dict, List, Optional, Tuple
 import csv
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class Patient:
+    """Representation of a single participant and optional metadata."""
+
+    participant_id: str
+    data: Dict[str, str] = field(default_factory=dict)
 
 
 
@@ -78,10 +91,10 @@ class BIDSFile:
         Run identifier (e.g. ``'01'`` for ``run-01``).  ``None`` if not
         provided.
     suffix : str
-        Suffix of the file (such as ``'bold'`` or ``'events'``).  In
-        BIDS this appears after the run number and task.
+        Datatype-specific suffix (e.g. ``'bold'``, ``'T1w'``, ``'dwi'``).
+        In BIDS this appears after any key‑value entities in the filename.
     datatype : str
-        Top‑level BIDS datatype folder (e.g. ``'func'``, ``'anat'``).
+        Top‑level BIDS datatype folder (e.g. ``'func'``, ``'anat'``, ``'dwi'``).
     path : str
         Absolute path to the file on disk.
     metadata : dict
@@ -105,6 +118,33 @@ class BIDSFile:
         )
 
 
+
+def parse_participants_tsv(path: str) -> Dict[str, Patient]:
+    """Parse a BIDS ``participants.tsv`` file into :class:`Patient` objects.
+
+    Parameters
+    ----------
+    path : str
+        Path to the ``participants.tsv`` file.
+
+    Returns
+    -------
+    Dict[str, Patient]
+        Mapping of participant IDs to :class:`Patient` instances.
+    """
+
+    participants: Dict[str, Patient] = {}
+    with open(path, newline="") as f:
+        reader = csv.DictReader(f, delimiter="\t")
+        for row in reader:
+            pid = row.get("participant_id")
+            if not pid:
+                logger.error("Row missing participant_id: %s", row)
+                raise ValueError("participant_id is required in participants.tsv")
+            data = {k: v for k, v in row.items() if k != "participant_id" and v != ""}
+            participants[pid] = Patient(participant_id=pid, data=data)
+    return participants
+=======
 @dataclass
 class Patient:
     """Store basic demographic and diagnostic information for a subject.
@@ -145,6 +185,7 @@ class Patient:
         return cls(attributes=extras, **known)
 
 
+
 class DatasetIndex:
     """Index a BIDS‑like dataset.
 
@@ -166,7 +207,10 @@ class DatasetIndex:
         self.root = os.path.abspath(root)
         if not os.path.exists(self.root):
             raise FileNotFoundError(f"Dataset path does not exist: {self.root}")
-        self.datatypes = datatypes if datatypes is not None else ["func"]
+
+        # datatypes to index (e.g. ['func', 'anat', 'dwi'])
+        self.datatypes = datatypes or ['func']
+
         self._subjects: List[str] = []
         # index: subject -> session -> list of BIDSFile
         self._index: Dict[str, Dict[Optional[str], List[BIDSFile]]] = {}
@@ -190,19 +234,26 @@ class DatasetIndex:
                         has_session = True
                         session_label = ses_entry[len('ses-'):]
                         self._index[subject_label][session_label] = []
-                        self._discover_files(subject_label, session_label, ses_path, self.datatypes)
+
                 if not has_session:
                     # no sessions: treat subject directory as session None
                     self._index[subject_label][None] = []
                     self._discover_files(subject_label, None, subj_path, self.datatypes)
+
     def _discover_files(
         self,
         subject: str,
         session: Optional[str],
         base_path: str,
+
         datatypes: Optional[List[str]] | None = None,
     ) -> None:
         """Populate index with files located under ``base_path`` for given datatypes.
+
+        datatypes: List[str],
+    ) -> None:
+        """Populate index with imaging files located under ``base_path``.
+
 
         Parameters
         ----------
@@ -214,6 +265,7 @@ class DatasetIndex:
         base_path : str
             Path to search for datatype directories (should be the subject or
             ``ses-`` directory).
+
         datatypes : list[str] | None, optional
             List of BIDS datatype directories to index.  Defaults to
             ``['func']``.
@@ -221,16 +273,24 @@ class DatasetIndex:
         if datatypes is None:
             datatypes = ["func"]
 
+
         for dtype in datatypes:
             dtype_dir = os.path.join(base_path, dtype)
             if not os.path.isdir(dtype_dir):
                 continue
             for fname in sorted(os.listdir(dtype_dir)):
+
                 if not fname.endswith('.nii') and not fname.endswith('.nii.gz'):
                     continue
                 # parse BIDS entities from filename
                 name, _ = os.path.splitext(fname)
                 if name.endswith('.nii'):  # remove .gz suffix if present
+
+                if not (fname.endswith('.nii') or fname.endswith('.nii.gz')):
+                    continue
+                name, _ = os.path.splitext(fname)
+                if name.endswith('.nii'):  # handle .nii.gz
+
                     name, _ = os.path.splitext(name)
                 tokens = name.split('_')
                 task = None
@@ -241,15 +301,15 @@ class DatasetIndex:
                         task = tok[len('task-'):]
                     elif tok.startswith('run-'):
                         run = tok[len('run-'):]
+
+                    elif tok.startswith('sub-') or tok.startswith('ses-'):
+                        continue
                     else:
                         suffix = tok
                 if suffix is None:
-                    continue
-                if dtype == 'func' and suffix != 'bold':
-                    # skip non‑BOLD files in func directory (e.g. sbref, events)
-                    continue
+                    suffix = 'bold' if dtype == 'func' else dtype
                 fpath = os.path.join(dtype_dir, fname)
-                # load sidecar JSON if present
+
                 json_path = fpath.replace('.nii.gz', '.json').replace('.nii', '.json')
                 metadata: Dict = {}
                 if os.path.exists(json_path):
@@ -286,6 +346,7 @@ class DatasetIndex:
         return list(self._index[subject].keys())
 
     def get_files(
+
         self,
         subject: str,
         session: Optional[str] | None = None,
@@ -350,7 +411,31 @@ class DatasetIndex:
         return self.get_files(subject, session=session, datatype='func')
 
 
+    def get_functional_runs(
+        self, subject: str, session: Optional[str] | None = None
+    ) -> List[BIDSFile]:
+        """Retrieve functional runs for a subject (and optional session)."""
+        return self.get_files('func', subject, session)
 
+
+
+
+
+class DatasetManager:
+    """Combine dataset indexing with participant metadata parsing."""
+
+    def __init__(self, root: str) -> None:
+        self.root = os.path.abspath(root)
+        self.index = DatasetIndex(self.root)
+        self.patients: Dict[str, Patient] = {}
+        participants_path = os.path.join(self.root, "participants.tsv")
+        if os.path.exists(participants_path):
+            try:
+                self.patients = parse_participants_tsv(participants_path)
+            except Exception as exc:  # pragma: no cover - logging side effect
+                logger.error("Failed to parse participants.tsv: %s", exc)
+        else:  # pragma: no cover - logging side effect
+            logger.warning("participants.tsv not found at %s", participants_path)
 
 
 __all__ = [
@@ -358,6 +443,4 @@ __all__ = [
     'Patient',
     'DatasetIndex',
 
-    'DatasetManager',
-]
 

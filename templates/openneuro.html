@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block title %}OpenNeuro Datasets{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">OpenNeuro Datasets</h1>
+</div>
+<form class="mb-3" method="get" action="{{ url_for('openneuro') }}">
+    <div class="input-group">
+        <input type="text" name="q" value="{{ search }}" class="form-control" placeholder="Search datasets">
+        <button class="btn btn-outline-secondary" type="submit">Search</button>
+    </div>
+</form>
+<div class="table-responsive">
+    <table class="table table-striped">
+        <thead><tr><th>ID</th><th>Name</th><th></th></tr></thead>
+        <tbody>
+        {% for ds in datasets %}
+        <tr>
+            <td>{{ ds.id }}</td>
+            <td>{{ ds.name }}</td>
+            <td>
+                {% if ds.id in downloaded %}
+                    <span class="badge bg-success">Downloaded</span>
+                {% else %}
+                    <form method="post" action="{{ url_for('download_openneuro') }}">
+                        <input type="hidden" name="dataset_id" value="{{ ds.id }}">
+                        <button class="btn btn-sm btn-primary" type="submit">Download and Index</button>
+                    </form>
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+<nav>
+    <ul class="pagination">
+        {% if page > 1 %}
+        <li class="page-item"><a class="page-link" href="{{ url_for('openneuro', q=search, page=page-1) }}">Previous</a></li>
+        {% endif %}
+        {% if has_next %}
+        <li class="page-item"><a class="page-link" href="{{ url_for('openneuro', q=search, page=page+1) }}">Next</a></li>
+        {% endif %}
+    </ul>
+</nav>
+{% endblock %}

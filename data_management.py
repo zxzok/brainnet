@@ -304,6 +304,34 @@ class DatasetManager:
         else:  # pragma: no cover - logging side effect
             logger.warning("participants.tsv not found at %s", participants_path)
 
+    @classmethod
+    def fetch_from_openneuro(
+        cls, dataset_id: str, dest_dir: str = "openneuro_datasets"
+    ) -> "DatasetManager":
+        """Download a dataset from OpenNeuro and create a manager for it.
+
+        Parameters
+        ----------
+        dataset_id:
+            Identifier of the OpenNeuro dataset (e.g. ``"ds000001"``).
+        dest_dir:
+            Directory under which the dataset will be stored. It will be
+            created if necessary.
+
+        Returns
+        -------
+        DatasetManager
+            A manager instance pointing to the downloaded dataset.
+        """
+
+        from openneuro import download  # Lazy import to avoid heavy dependency
+
+        os.makedirs(dest_dir, exist_ok=True)
+        target = os.path.join(dest_dir, dataset_id)
+        if not os.path.exists(target):
+            download(dataset=dataset_id, target_dir=target)
+        return cls(target)
+
 
 __all__ = [
     "BIDSFile",

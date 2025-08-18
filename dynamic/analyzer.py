@@ -19,6 +19,8 @@ then call :meth:`analyse` on ROI time series to obtain a
 
 from __future__ import annotations
 
+from typing import Optional
+
 import numpy as np
 
 from .config import DynamicConfig
@@ -50,7 +52,7 @@ class DynamicAnalyzer:
         self.config = config
 
     # --------------------------------------------------------------
-    def analyse(self, roi_timeseries: np.ndarray) -> DynamicStateModel:
+    def analyse(self, roi_timeseries: np.ndarray, template: Optional[str] = None) -> DynamicStateModel:
         """Run dynamic analysis on ROI time series.
 
         This method inspects the ``method`` field of the configuration
@@ -78,11 +80,11 @@ class DynamicAnalyzer:
         """
         method = self.config.method
         if method == 'kmeans':
-            return kmeans_analysis(roi_timeseries, self.config)
+            return kmeans_analysis(roi_timeseries, self.config, template)
         elif method == 'hmm':
-            return hmm_analysis(roi_timeseries, self.config)
+            return hmm_analysis(roi_timeseries, self.config, template)
         elif method == 'cap':
-            return cap_analysis(roi_timeseries, self.config)
+            return cap_analysis(roi_timeseries, self.config, template)
         else:
             raise ValueError(f"Unknown dynamic analysis method '{method}'")
 

@@ -23,7 +23,7 @@ be raised.
 
 from __future__ import annotations
 
-from typing import List
+from typing import List, Optional
 
 import numpy as np
 from sklearn.cluster import KMeans
@@ -33,7 +33,9 @@ from .model import DynamicStateModel
 from .metrics import compute_state_metrics
 
 
-def cap_analysis(roi_timeseries: np.ndarray, config: DynamicConfig) -> DynamicStateModel:
+def cap_analysis(
+    roi_timeseries: np.ndarray, config: DynamicConfig, template: Optional[str] = None
+) -> DynamicStateModel:
     """Perform co‑activation pattern (CAP) analysis.
 
     Parameters
@@ -111,6 +113,7 @@ def cap_analysis(roi_timeseries: np.ndarray, config: DynamicConfig) -> DynamicSt
         state_sequence=seq,
         metrics=metrics,
         extra=extra,
+        template=template,
     )
 
 

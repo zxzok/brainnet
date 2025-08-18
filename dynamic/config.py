@@ -32,7 +32,8 @@ class DynamicConfig:
         interpretation depends on the chosen method.  Defaults to 4.
     method : str, optional
         Method used for state identification.  Supported values are
-        ``'kmeans'`` (default), ``'hmm'`` and ``'cap'``.
+        ``'kmeans'`` (default), ``'hmm'``, ``'cap'`` and
+        ``'hierarchical'``.
     cap_threshold : float, optional
         Threshold in standard deviations for selecting high amplitude
         events in CAP analysis.  Defaults to 1.5.
@@ -66,5 +67,5 @@ class DynamicConfig:
             raise ValueError("window_length and step must be positive integers")
         if self.window_length > n_timepoints:
             raise ValueError("window_length exceeds number of time points in data")
-        if self.method not in {'kmeans', 'hmm', 'cap'}:
+        if self.method not in {'kmeans', 'hmm', 'cap', 'hierarchical'}:
             raise ValueError(f"Unknown dynamic method '{self.method}'")

@@ -6,12 +6,14 @@ This module defines the :class:`DynamicAnalyzer` class, a high level
 interface for performing dynamic functional connectivity analysis on
 ROI time series.  It uses the configuration supplied via
 :class:`brainnet.dynamic.config.DynamicConfig` to select the
-appropriate analysis method (K‑means, HMM or CAP), compute sliding
-window connectivity where necessary, identify discrete brain states
-and derive summary metrics of the temporal dynamics.
+appropriate analysis method (K‑means, HMM, hierarchical clustering or
+CAP), compute sliding window connectivity where necessary, identify
+discrete brain states and derive summary metrics of the temporal
+dynamics.
 
 The class delegates to specialised functions in the :mod:`kmeans`,
-:mod:`hmm` and :mod:`cap` modules depending on the chosen method.
+:mod:`hmm`, :mod:`hierarchical` and :mod:`cap` modules depending on
+the chosen method.
 Users can instantiate ``DynamicAnalyzer`` with a configuration and
 then call :meth:`analyse` on ROI time series to obtain a
 :class:`brainnet.dynamic.model.DynamicStateModel` object.
@@ -28,6 +30,7 @@ from .model import DynamicStateModel
 from .kmeans import kmeans_analysis
 from .hmm import hmm_analysis
 from .cap import cap_analysis
+from .hierarchical import hierarchical_analysis
 
 
 class DynamicAnalyzer:
@@ -61,6 +64,7 @@ class DynamicAnalyzer:
 
         * ``'kmeans'`` – sliding window K‑means clustering.
         * ``'hmm'`` – Gaussian hidden Markov model fitting.
+        * ``'hierarchical'`` – agglomerative hierarchical clustering.
         * ``'cap'`` – co‑activation pattern analysis.
 
         Parameters
@@ -85,6 +89,8 @@ class DynamicAnalyzer:
             return hmm_analysis(roi_timeseries, self.config, template)
         elif method == 'cap':
             return cap_analysis(roi_timeseries, self.config, template)
+        elif method == 'hierarchical':
+            return hierarchical_analysis(roi_timeseries, self.config, template)
         else:
             raise ValueError(f"Unknown dynamic analysis method '{method}'")
 

@@ -28,9 +28,10 @@ metrics
     Provides functions to compute temporal statistics (occupancy,
     dwell time, transition probabilities) from a state sequence.
 
-kmeans, hmm, cap
+kmeans, hmm, hierarchical, cap
     Implement specific methods for state identification via K‑means
-    clustering, Gaussian HMMs or co‑activation pattern (CAP) analysis.
+    clustering, Gaussian HMMs, hierarchical clustering or
+    co‑activation pattern (CAP) analysis.
 
 analyzer
     Contains :class:`DynamicAnalyzer`, a high level interface that

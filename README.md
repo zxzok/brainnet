@@ -21,6 +21,18 @@ Metadata from file names (e.g. ``acq-highres``) and sidecar JSON files
 are accessible via the :pyattr:`~brainnet.data_management.BIDSFile.metadata`
 attribute.
 
+## OpenNeuro downloads and caching
+
+The optional [`openneuro-py`](https://github.com/brainlife/openneuro-py)
+dependency allows the pipeline to fetch example datasets from
+[OpenNeuro](https://openneuro.org). Using this feature requires outbound
+HTTPS access to `openneuro.org` so the environment must permit network
+connections. Downloaded datasets are cached under
+`~/.cache/openneuro` by default; set the `OPENNEURO_CACHE_DIR`
+environment variable to change the cache location. For more robust and
+resumable large-file transfers you may also install the optional
+`datalad` package.
+
 ## External Dependencies
 
 | Step | Method | Required command |

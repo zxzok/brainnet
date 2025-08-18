@@ -19,7 +19,7 @@ If ``hmmlearn`` is not installed, attempting to call
 
 from __future__ import annotations
 
-from typing import List
+from typing import List, Optional
 
 import numpy as np
 
@@ -33,7 +33,9 @@ except Exception:
     GaussianHMM = None  # type: ignore
 
 
-def hmm_analysis(roi_timeseries: np.ndarray, config: DynamicConfig) -> DynamicStateModel:
+def hmm_analysis(
+    roi_timeseries: np.ndarray, config: DynamicConfig, template: Optional[str] = None
+) -> DynamicStateModel:
     """Perform dynamic connectivity analysis using a Gaussian HMM.
 
     Parameters
@@ -92,6 +94,7 @@ def hmm_analysis(roi_timeseries: np.ndarray, config: DynamicConfig) -> DynamicSt
         state_sequence=hidden_states.astype(int),
         metrics=metrics,
         extra=extra,
+        template=template,
     )
 
 

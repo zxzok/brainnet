@@ -69,6 +69,9 @@ from __future__ import annotations
 
 import os
 import subprocess
+import logging
+import shutil
+import tempfile
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple, Sequence
@@ -82,6 +85,9 @@ try:
     import nibabel as nib
 except Exception:
     nib = None  # nibabel may not be available
+
+
+logger = logging.getLogger(__name__)
 
 
 class ProcessingStep(ABC):
@@ -121,7 +127,9 @@ class ProcessingStep(ABC):
 @dataclass
 class SliceTimingConfig:
     enabled: bool = True
+    method: str = 'none'  # 'none', 'fsl', 'spm'
     slice_times: Optional[Sequence[float]] = None  # length equals number of slices
+    extra_args: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -197,21 +205,78 @@ class SliceTimingStep(ProcessingStep):
         self.config = config
 
     def run(self, data: np.ndarray, meta: Dict[str, Any]) -> Tuple[np.ndarray, Dict[str, Any]]:
-        if not self.config.enabled:
+        if not self.config.enabled or self.config.method == 'none':
             return data, meta
-        # No slice timing information provided: no-op
-        if self.config.slice_times is None:
+        method = self.config.method.lower()
+        if method == 'fsl':
+            if nib is None:
+                raise RuntimeError("nibabel is required for slice timing but not available")
+            cmd_path = shutil.which('slicetimer')
+            if cmd_path is None:
+                logger.error('FSL slicetimer not found in PATH')
+                raise RuntimeError('slicetimer command not found')
+            tr = meta.get('TR')
+            if tr is None:
+                logger.error('TR is required for FSL slicetimer')
+                raise RuntimeError('TR missing for slice timing')
+            with tempfile.TemporaryDirectory() as tmpdir:
+                in_path = os.path.join(tmpdir, 'in.nii.gz')
+                out_path = os.path.join(tmpdir, 'out.nii.gz')
+                img = nib.Nifti1Image(data, meta.get('affine', np.eye(4)))
+                nib.save(img, in_path)
+                cmd = [cmd_path, '-i', in_path, '-o', out_path, '--repeat', str(tr)]
+                if self.config.slice_times is not None:
+                    times_file = os.path.join(tmpdir, 'times.txt')
+                    np.savetxt(times_file, np.array(self.config.slice_times), fmt='%.6f')
+                    cmd.extend(['--tcustom', times_file])
+                for k, v in self.config.extra_args.items():
+                    cmd.append(str(k))
+                    if v is not None:
+                        cmd.append(str(v))
+                try:
+                    subprocess.run(cmd, check=True, capture_output=True)
+                    out_img = nib.load(out_path)
+                    data = np.asanyarray(out_img.get_fdata())
+                except FileNotFoundError:
+                    logger.error('slicetimer command not found')
+                    raise RuntimeError('slicetimer command not found')
+                except subprocess.CalledProcessError as e:
+                    logger.error('slicetimer failed: %s', e.stderr.decode('utf-8', 'ignore'))
+                    raise RuntimeError('slice timing correction failed') from e
             return data, meta
-        # extract TR
-        tr = meta.get('TR')
-        if tr is None:
-            # cannot correct without TR
+        elif method == 'spm':
+            matlab = shutil.which('matlab') or shutil.which('octave')
+            if matlab is None:
+                logger.error('MATLAB/Octave not found for SPM slice timing')
+                raise RuntimeError('MATLAB/Octave command not found')
+            if nib is None:
+                raise RuntimeError('nibabel is required for slice timing but not available')
+            with tempfile.TemporaryDirectory() as tmpdir:
+                in_path = os.path.join(tmpdir, 'in.nii')
+                out_path = os.path.join(tmpdir, 'out.nii')
+                img = nib.Nifti1Image(data, meta.get('affine', np.eye(4)))
+                nib.save(img, in_path)
+                script = (
+                    "try, spm('defaults','fmri'); "
+                    f"P='{in_path}'; "
+                    "spm_slice_timing(P); "
+                    f"movefile('a{os.path.basename(in_path)}','{out_path}'); "
+                    "catch e, disp(getReport(e)); exit(1); end; exit;"
+                )
+                cmd = [matlab, '-nodisplay', '-nosplash', '-r', script]
+                try:
+                    subprocess.run(cmd, check=True, capture_output=True)
+                    out_img = nib.load(out_path)
+                    data = np.asanyarray(out_img.get_fdata())
+                except FileNotFoundError:
+                    logger.error('MATLAB/Octave not found for SPM slice timing')
+                    raise RuntimeError('MATLAB/Octave command not found')
+                except subprocess.CalledProcessError as e:
+                    logger.error('SPM slice timing failed: %s', e.stderr.decode('utf-8', 'ignore'))
+                    raise RuntimeError('SPM slice timing failed') from e
             return data, meta
-        # naive implementation: shifts signals by integer number of samples
-        # according to slice acquisition order; real implementation should
-        # perform interpolation (e.g. via sinc interpolation).  Here we
-        # simply return the unmodified data as a placeholder.
-        return data, meta
+        else:
+            raise ValueError(f"Unknown slice timing method '{self.config.method}'")
 
 
 class MotionCorrectionStep(ProcessingStep):
@@ -259,11 +324,72 @@ class MotionCorrectionStep(ProcessingStep):
                 motion_params.append(np.hstack([shift, [0, 0, 0]]))  # rotation set to zero
             meta['motion_params'] = np.array(motion_params)
             return corrected, meta
-        elif method in {'fsl', 'spm'}:
-            # call external tool via subprocess; not implemented here
-            raise NotImplementedError(
-                f"Motion correction with method '{method}' requires external software"
-            )
+        elif method == 'fsl':
+            if nib is None:
+                raise RuntimeError('nibabel is required for motion correction but not available')
+            cmd_path = shutil.which('mcflirt')
+            if cmd_path is None:
+                logger.error('FSL mcflirt not found in PATH')
+                raise RuntimeError('mcflirt command not found')
+            with tempfile.TemporaryDirectory() as tmpdir:
+                in_path = os.path.join(tmpdir, 'in.nii.gz')
+                out_path = os.path.join(tmpdir, 'out.nii.gz')
+                img = nib.Nifti1Image(data, meta.get('affine', np.eye(4)))
+                nib.save(img, in_path)
+                cmd = [cmd_path, '-in', in_path, '-out', out_path, '-refvol', str(self.config.reference_volume)]
+                for k, v in self.config.extra_args.items():
+                    cmd.append(str(k))
+                    if v is not None:
+                        cmd.append(str(v))
+                try:
+                    subprocess.run(cmd, check=True, capture_output=True)
+                    out_img = nib.load(out_path)
+                    data = np.asanyarray(out_img.get_fdata())
+                    par_path = out_path + '.par'
+                    if os.path.exists(par_path):
+                        meta['motion_params'] = np.loadtxt(par_path)
+                except FileNotFoundError:
+                    logger.error('mcflirt command not found')
+                    raise RuntimeError('mcflirt command not found')
+                except subprocess.CalledProcessError as e:
+                    logger.error('mcflirt failed: %s', e.stderr.decode('utf-8', 'ignore'))
+                    raise RuntimeError('FSL mcflirt failed') from e
+            return data, meta
+        elif method == 'spm':
+            matlab = shutil.which('matlab') or shutil.which('octave')
+            if matlab is None:
+                logger.error('MATLAB/Octave not found for SPM motion correction')
+                raise RuntimeError('MATLAB/Octave command not found')
+            if nib is None:
+                raise RuntimeError('nibabel is required for motion correction but not available')
+            with tempfile.TemporaryDirectory() as tmpdir:
+                in_path = os.path.join(tmpdir, 'in.nii')
+                out_path = os.path.join(tmpdir, 'out.nii')
+                img = nib.Nifti1Image(data, meta.get('affine', np.eye(4)))
+                nib.save(img, in_path)
+                script = (
+                    "try, spm('defaults','fmri'); "
+                    f"P='{in_path}'; "
+                    "spm_realign(P); spm_reslice(P); "
+                    f"movefile('r{os.path.basename(in_path)}','{out_path}'); "
+                    f"save('rp_{os.path.basename(in_path).split('.')[0]}.txt',rp_{os.path.basename(in_path).split('.')[0]}); "
+                    "catch e, disp(getReport(e)); exit(1); end; exit;"
+                )
+                cmd = [matlab, '-nodisplay', '-nosplash', '-r', script]
+                try:
+                    subprocess.run(cmd, check=True, capture_output=True)
+                    out_img = nib.load(out_path)
+                    data = np.asanyarray(out_img.get_fdata())
+                    par_path = os.path.join(tmpdir, f"rp_{os.path.basename(in_path).split('.')[0]}.txt")
+                    if os.path.exists(par_path):
+                        meta['motion_params'] = np.loadtxt(par_path)
+                except FileNotFoundError:
+                    logger.error('MATLAB/Octave not found for SPM motion correction')
+                    raise RuntimeError('MATLAB/Octave command not found')
+                except subprocess.CalledProcessError as e:
+                    logger.error('SPM motion correction failed: %s', e.stderr.decode('utf-8', 'ignore'))
+                    raise RuntimeError('SPM motion correction failed') from e
+            return data, meta
         else:
             raise ValueError(f"Unknown motion correction method '{self.config.method}'")
 
@@ -292,9 +418,126 @@ class SpatialNormalizationStep(ProcessingStep):
     def run(self, data: np.ndarray, meta: Dict[str, Any]) -> Tuple[np.ndarray, Dict[str, Any]]:
         if not self.config.enabled or self.config.method == 'none':
             return data, meta
-        raise NotImplementedError(
-            "Spatial normalization requires external registration software"
-        )
+        method = self.config.method.lower()
+        if method == 'fsl':
+            if nib is None:
+                raise RuntimeError('nibabel is required for spatial normalization but not available')
+            cmd_path = shutil.which('flirt')
+            if cmd_path is None:
+                logger.error('FSL flirt not found in PATH')
+                raise RuntimeError('flirt command not found')
+            if not self.config.template_path:
+                raise RuntimeError('template_path must be provided for FSL normalization')
+            with tempfile.TemporaryDirectory() as tmpdir:
+                in_path = os.path.join(tmpdir, 'in.nii.gz')
+                out_path = os.path.join(tmpdir, 'out.nii.gz')
+                img = nib.Nifti1Image(data, meta.get('affine', np.eye(4)))
+                nib.save(img, in_path)
+                cmd = [cmd_path, '-in', in_path, '-ref', self.config.template_path, '-out', out_path]
+                for k, v in self.config.extra_args.items():
+                    cmd.append(str(k))
+                    if v is not None:
+                        cmd.append(str(v))
+                try:
+                    subprocess.run(cmd, check=True, capture_output=True)
+                    out_img = nib.load(out_path)
+                    data = np.asanyarray(out_img.get_fdata())
+                except FileNotFoundError:
+                    logger.error('flirt command not found')
+                    raise RuntimeError('flirt command not found')
+                except subprocess.CalledProcessError as e:
+                    logger.error('flirt failed: %s', e.stderr.decode('utf-8', 'ignore'))
+                    raise RuntimeError('FSL flirt failed') from e
+            return data, meta
+        elif method == 'ants':
+            if nib is None:
+                raise RuntimeError('nibabel is required for spatial normalization but not available')
+            reg_cmd = shutil.which('antsRegistration')
+            apply_cmd = shutil.which('antsApplyTransforms')
+            if reg_cmd is None or apply_cmd is None:
+                logger.error('ANTs commands not found in PATH')
+                raise RuntimeError('ANTs commands not found')
+            if not self.config.template_path:
+                raise RuntimeError('template_path must be provided for ANTs normalization')
+            with tempfile.TemporaryDirectory() as tmpdir:
+                in_path = os.path.join(tmpdir, 'in.nii.gz')
+                out_prefix = os.path.join(tmpdir, 'ants_')
+                warped = out_prefix + 'Warped.nii.gz'
+                img = nib.Nifti1Image(data, meta.get('affine', np.eye(4)))
+                nib.save(img, in_path)
+                cmd = [
+                    reg_cmd,
+                    '--dimensionality', '3',
+                    '--output', out_prefix,
+                    '--transform', 'rigid[0.1]',
+                    '--metric', f"MI[{self.config.template_path},{in_path},1,32,Regular,0.25]",
+                    '--convergence', '[1000x500x250x0,1e-6,10]',
+                    '--shrink-factors', '8x4x2x1',
+                    '--smoothing-sigmas', '4x2x1x0vox',
+                    '--use-histogram-matching', '0',
+                    '--interpolation', 'Linear'
+                ]
+                for k, v in self.config.extra_args.items():
+                    cmd.append(str(k))
+                    if v is not None:
+                        cmd.append(str(v))
+                try:
+                    subprocess.run(cmd, check=True, capture_output=True)
+                    apply = [
+                        apply_cmd,
+                        '-d', '3',
+                        '-i', in_path,
+                        '-r', self.config.template_path,
+                        '-o', warped,
+                        '-t', out_prefix + '0GenericAffine.mat'
+                    ]
+                    subprocess.run(apply, check=True, capture_output=True)
+                    out_img = nib.load(warped)
+                    data = np.asanyarray(out_img.get_fdata())
+                except FileNotFoundError:
+                    logger.error('ANTs commands not found')
+                    raise RuntimeError('ANTs commands not found')
+                except subprocess.CalledProcessError as e:
+                    logger.error('ANTs registration failed: %s', e.stderr.decode('utf-8', 'ignore'))
+                    raise RuntimeError('ANTs normalization failed') from e
+            return data, meta
+        elif method == 'spm':
+            matlab = shutil.which('matlab') or shutil.which('octave')
+            if matlab is None:
+                logger.error('MATLAB/Octave not found for SPM normalization')
+                raise RuntimeError('MATLAB/Octave command not found')
+            if nib is None:
+                raise RuntimeError('nibabel is required for spatial normalization but not available')
+            if not self.config.template_path:
+                raise RuntimeError('template_path must be provided for SPM normalization')
+            with tempfile.TemporaryDirectory() as tmpdir:
+                in_path = os.path.join(tmpdir, 'in.nii')
+                out_path = os.path.join(tmpdir, 'out.nii')
+                img = nib.Nifti1Image(data, meta.get('affine', np.eye(4)))
+                nib.save(img, in_path)
+                script = (
+                    "try, spm('defaults','fmri'); "
+                    f"P='{in_path}'; T='{self.config.template_path}'; "
+                    "est=spm_vol(T); res=spm_vol(P); "
+                    "spm_normalise(est, res, 'param.mat', '', res, ''); "
+                    "spm_write_sn(P,'param.mat'); "
+                    f"movefile('w{os.path.basename(in_path)}','{out_path}'); "
+                    "catch e, disp(getReport(e)); exit(1); end; exit;"
+                )
+                cmd = [matlab, '-nodisplay', '-nosplash', '-r', script]
+                try:
+                    subprocess.run(cmd, check=True, capture_output=True)
+                    out_img = nib.load(out_path)
+                    data = np.asanyarray(out_img.get_fdata())
+                except FileNotFoundError:
+                    logger.error('MATLAB/Octave not found for SPM normalization')
+                    raise RuntimeError('MATLAB/Octave command not found')
+                except subprocess.CalledProcessError as e:
+                    logger.error('SPM normalization failed: %s', e.stderr.decode('utf-8', 'ignore'))
+                    raise RuntimeError('SPM normalization failed') from e
+            return data, meta
+        else:
+            raise ValueError(f"Unknown spatial normalization method '{self.config.method}'")
 
 
 class SmoothingStep(ProcessingStep):
@@ -483,7 +726,7 @@ class PreprocessPipeline:
         data = np.asanyarray(img.get_fdata())
         affine = img.affine.copy()
         header = img.header
-        meta: Dict[str, Any] = {}
+        meta: Dict[str, Any] = {'affine': affine}
         # TR from header zooms
         try:
             meta['TR'] = float(header.get_zooms()[-1])

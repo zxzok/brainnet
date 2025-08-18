@@ -91,10 +91,15 @@ class PreprocConfig:
         If ``True``, remove linear trends from each voxel/ROI time
         course prior to filtering and nuisance regression.
     extract_roi : bool
-        Whether to compute ROI mean time courses from an atlas.
+        Whether to compute ROI mean time courses from one or more atlases.
     roi_atlas_path : str | None
-        Path to a labelled atlas NIfTI file.  Required if
-        ``extract_roi`` is ``True``.
+        Path to a labelled atlas NIfTI file.  Retained for backwards
+        compatibility when extracting a single custom atlas.
+    roi_templates : Sequence[str] | None
+        Names of built‑in templates to load (e.g. ``'aal'`` or
+        ``'harvardoxford'``).  Multiple templates can be specified.
+    custom_atlases : Dict[str, str] | None
+        Mapping of custom template names to atlas NIfTI paths.
     retain_4d : bool
         If ``True``, keep the processed 4D data in memory in the
         :class:`PreprocessedData` object.  Otherwise the 4D data
@@ -110,11 +115,17 @@ class PreprocConfig:
     detrend: bool = True
     extract_roi: bool = False
     roi_atlas_path: Optional[str] = None
+    roi_templates: Optional[Sequence[str]] = None
+    custom_atlases: Optional[Dict[str, str]] = None
     retain_4d: bool = False
 
     def validate(self) -> None:
-        if self.extract_roi and not self.roi_atlas_path:
-            raise ValueError("ROI extraction requested but no atlas path provided")
+        if self.extract_roi and not (
+            self.roi_atlas_path or self.roi_templates or self.custom_atlases
+        ):
+            raise ValueError(
+                "ROI extraction requested but no atlas or template provided"
+            )
         if self.low_cut is not None and self.high_cut is not None:
             if self.low_cut >= self.high_cut:
                 raise ValueError("low_cut must be less than high_cut for bandpass filtering")
@@ -129,9 +140,9 @@ class PreprocessedData:
     data : np.ndarray | None
         The preprocessed 4D data array with shape (X, Y, Z, T).  This
         may be ``None`` if ``retain_4d`` was set to ``False``.
-    roi_timeseries : np.ndarray | None
-        Array of shape (T, N_ROI) containing the mean time course for
-        each ROI.  ``None`` if ROI extraction was not performed.
+    roi_timeseries : Dict[str, np.ndarray]
+        Mapping from template name to 2D array ``(T, N_ROI)`` containing
+        mean time courses.  Empty if ROI extraction was not performed.
     tr : float
         Repetition time (TR) in seconds, extracted from the metadata.
     qc_metrics : Dict[str, float]
@@ -144,30 +155,19 @@ class PreprocessedData:
         if not available.
     """
     data: Optional[np.ndarray] = None
-    roi_timeseries: Optional[np.ndarray] = None
+    roi_timeseries: Dict[str, np.ndarray] = field(default_factory=dict)
     tr: Optional[float] = None
     qc_metrics: Dict[str, float] = field(default_factory=dict)
     affine: Optional[np.ndarray] = None
     mask: Optional[np.ndarray] = None
+    roi_labels: Dict[str, Sequence[str]] = field(default_factory=dict)
 
-    def get_roi_dataframe(self, roi_labels: Sequence[str]) -> pd.DataFrame:
-        """Return ROI time series as a :class:`pandas.DataFrame`.
-
-        Parameters
-        ----------
-        roi_labels : list of str
-            Names of the ROIs in the same order as the columns of
-            ``roi_timeseries``.
-
-        Returns
-        -------
-        pandas.DataFrame
-            A DataFrame with shape (T, N_ROI) where each column is a
-            labelled time series.
-        """
-        if self.roi_timeseries is None:
-            raise ValueError("No ROI time series available")
-        return pd.DataFrame(self.roi_timeseries, columns=list(roi_labels))
+    def get_roi_dataframe(self, template: str) -> pd.DataFrame:
+        """Return ROI time series for a template as a DataFrame."""
+        if template not in self.roi_timeseries:
+            raise ValueError(f"No ROI time series available for template '{template}'")
+        labels = self.roi_labels.get(template, [])
+        return pd.DataFrame(self.roi_timeseries[template], columns=list(labels))
 
 
 class Preprocessor:
@@ -181,18 +181,37 @@ class Preprocessor:
     def __init__(self, config: PreprocConfig) -> None:
         self.config = config
         self.config.validate()
-        # load atlas once if ROI extraction requested
-        self._atlas_data: Optional[np.ndarray] = None
-        self._atlas_labels: Optional[List[int]] = None
+        # load atlases/templates once if ROI extraction requested
+        self._atlas_data: Dict[str, np.ndarray] = {}
+        self._atlas_labels: Dict[str, List[str]] = {}
         if self.config.extract_roi:
             if nib is None:
                 raise RuntimeError("nibabel is required for ROI extraction but not available")
-            atlas_img = nib.load(self.config.roi_atlas_path)
-            self._atlas_data = np.asanyarray(atlas_img.get_fdata())
-            # unique non‑zero labels sorted
-            labels = np.unique(self._atlas_data)
-            labels = labels[labels != 0]
-            self._atlas_labels = labels.astype(int).tolist()
+            from .templates import load_template
+            # built‑in templates
+            if self.config.roi_templates:
+                for name in self.config.roi_templates:
+                    tmpl = load_template(name)
+                    atlas_img = nib.load(tmpl.atlas_path)
+                    self._atlas_data[tmpl.name] = np.asanyarray(atlas_img.get_fdata())
+                    self._atlas_labels[tmpl.name] = [str(l) for l in tmpl.labels]
+            # single legacy atlas path
+            if self.config.roi_atlas_path:
+                atlas_img = nib.load(self.config.roi_atlas_path)
+                data = np.asanyarray(atlas_img.get_fdata())
+                labels = np.unique(data)
+                labels = labels[labels != 0]
+                self._atlas_data['custom'] = data
+                self._atlas_labels['custom'] = labels.astype(int).astype(str).tolist()
+            # multiple custom atlases
+            if self.config.custom_atlases:
+                for name, path in self.config.custom_atlases.items():
+                    atlas_img = nib.load(path)
+                    data = np.asanyarray(atlas_img.get_fdata())
+                    labels = np.unique(data)
+                    labels = labels[labels != 0]
+                    self._atlas_data[name] = data
+                    self._atlas_labels[name] = labels.astype(int).astype(str).tolist()
 
     # ------------------------------------------------------------------
     def preprocess(self, func_path: str, confounds_path: Optional[str] = None) -> PreprocessedData:
@@ -322,9 +341,11 @@ class Preprocessor:
         qc = {'tSNR': tSNR}
 
         # ROI extraction
-        roi_ts: Optional[np.ndarray] = None
-        if self.config.extract_roi and self._atlas_data is not None:
-            roi_ts = self._extract_roi_time_series(data)
+        roi_ts: Dict[str, np.ndarray] = {}
+        if self.config.extract_roi and self._atlas_data:
+            for name, atlas in self._atlas_data.items():
+                labels = [int(l) for l in self._atlas_labels.get(name, [])]
+                roi_ts[name] = self._extract_roi_time_series(data, atlas, labels)
 
         # optionally discard 4D data to save memory
         data_out: Optional[np.ndarray] = data if self.config.retain_4d else None
@@ -336,34 +357,20 @@ class Preprocessor:
             qc_metrics=qc,
             affine=affine,
             mask=None,
+            roi_labels=self._atlas_labels,
         )
 
     # ------------------------------------------------------------------
-    def _extract_roi_time_series(self, data: np.ndarray) -> np.ndarray:
-        """Compute mean time courses for each ROI defined in the atlas.
-
-        Parameters
-        ----------
-        data : np.ndarray
-            Preprocessed 4D data array (X, Y, Z, T).
-
-        Returns
-        -------
-        np.ndarray
-            2D array of shape (T, N_ROI) containing mean signals per ROI.
-        """
-        if self._atlas_data is None or self._atlas_labels is None:
-            raise ValueError("ROI extraction requested but atlas not loaded")
-        atlas = self._atlas_data
-        labels = self._atlas_labels
-        # flatten spatial dims to index voxels by ROI
+    def _extract_roi_time_series(
+        self, data: np.ndarray, atlas: np.ndarray, labels: Sequence[int]
+    ) -> np.ndarray:
+        """Compute mean time courses for each ROI defined in ``atlas``."""
         T = data.shape[-1]
         roi_ts = np.zeros((T, len(labels)), dtype=float)
         for idx, lbl in enumerate(labels):
             mask = atlas == lbl
             if not np.any(mask):
                 continue
-            # mean across voxels in mask
             voxels = data[mask, :]
             roi_ts[:, idx] = voxels.mean(axis=0)
         return roi_ts

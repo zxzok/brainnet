@@ -237,10 +237,12 @@ def openneuro():
     conn.close()
     return render_template(
         'openneuro.html',
+
         datasets=listing['datasets'],
         search=search,
         page=page,
         has_next=listing['has_next'],
+
         downloaded=downloaded,
     )
 

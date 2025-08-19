@@ -14,12 +14,24 @@
 </form>
 <div class="table-responsive">
     <table class="table table-striped">
-        <thead><tr><th>ID</th><th>Name</th><th></th></tr></thead>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Description</th>
+                <th>Modalities</th>
+                <th>Tasks</th>
+                <th></th>
+            </tr>
+        </thead>
         <tbody>
         {% for ds in datasets %}
         <tr>
             <td>{{ ds.id }}</td>
             <td>{{ ds.name }}</td>
+            <td>{{ ds.description }}</td>
+            <td>{{ ds.modalities | join(', ') }}</td>
+            <td>{{ ds.tasks | join(', ') }}</td>
             <td>
                 {% if ds.id in downloaded %}
                     <span class="badge bg-success">Downloaded</span>

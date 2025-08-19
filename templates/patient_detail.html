@@ -62,7 +62,7 @@
                     <div class="col-auto">
                         <select name="dataset_id" class="form-select">
                             {% for ds in openneuro_datasets %}
-                            <option value="{{ ds[0] }}">{{ ds[0] }}</option>
+                            <option value="{{ ds[0] }}">{{ ds[0] }} - {{ ds[1] }}</option>
                             {% endfor %}
                         </select>
                     </div>

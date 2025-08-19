@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
+import base64
+import json
 from typing import Any, Dict, List, Optional
 
 import requests
@@ -30,62 +32,69 @@ def _graphql_query(query: str, variables: Optional[Dict[str, Any]] = None) -> Di
     return payload.get("data", {})
 
 
-def list_datasets(search_term: Optional[str] = None) -> List[Dict[str, Optional[str]]]:
-    """Retrieve available datasets from OpenNeuro.
+def list_datasets(
+    search: Optional[str] = None, page: int = 1, per_page: int = 50
+) -> Dict[str, Any]:
+    """Retrieve a single page of datasets from OpenNeuro.
 
     Parameters
     ----------
-    search_term : str | None
+    search : str | None
         Optional text to filter dataset names and descriptions.
+    page : int
+        Page number (1-indexed).
+    per_page : int
+        Number of datasets to return per page.
 
     Returns
     -------
-    list of dict
-        Each dictionary contains ``id``, ``name`` and ``description`` keys.
+    dict
+        Dictionary with keys ``datasets`` and ``has_next``. ``datasets`` is a list
+        of dictionaries containing ``id``, ``name`` and ``description`` keys.
     """
-    datasets: List[Dict[str, Optional[str]]] = []
-    cursor: Optional[str] = None
+    offset = max(page - 1, 0) * per_page
+    after = None
+    if offset:
+        after = base64.b64encode(json.dumps({"offset": offset}).encode()).decode()
+
     query_all = (
-        "query($after:String){"  # noqa: E501
-        "datasets(first:50,after:$after,filterBy:{all:true})"
+        "query($first:Int!,$after:String){"
+        "datasets(first:$first,after:$after,filterBy:{all:true})"
         "{pageInfo{endCursor hasNextPage}"
         " edges{node{id name latestSnapshot{description{Name}}}}}"
         "}"
     )
     query_search = (
-        "query($q:String!,$after:String){"  # noqa: E501
-        "search(q:$q,first:50,after:$after)"
+        "query($q:String!,$first:Int!,$after:String){"
+        "search(q:$q,first:$first,after:$after)"
         "{pageInfo{endCursor hasNextPage}"
         " edges{node{id name latestSnapshot{description{Name}}}}}"
         "}"
     )
-    while True:
-        variables: Dict[str, Any] = {"after": cursor}
-        if search_term:
-            variables["q"] = search_term
-            data = _graphql_query(query_search, variables)["search"]
-        else:
-            data = _graphql_query(query_all, variables)["datasets"]
-        for edge in data.get("edges", []):
-            if not edge:
-                continue
-            node = edge.get("node")
-            if not node:
-                continue
-            desc_obj = node.get("latestSnapshot", {}).get("description") or {}
-            datasets.append(
-                {
-                    "id": node.get("id"),
-                    "name": node.get("name"),
-                    "description": desc_obj.get("Name"),
-                }
-            )
-        page = data.get("pageInfo", {})
-        if page.get("hasNextPage"):
-            cursor = page.get("endCursor")
-        else:
-            break
-    return datasets
+
+    variables: Dict[str, Any] = {"first": per_page, "after": after}
+    if search:
+        variables["q"] = search
+        data = _graphql_query(query_search, variables).get("search", {})
+    else:
+        data = _graphql_query(query_all, variables).get("datasets", {})
+
+    datasets: List[Dict[str, Optional[str]]] = []
+    for edge in data.get("edges", []):
+        node = edge.get("node") if edge else None
+        if not node:
+            continue
+        desc_obj = node.get("latestSnapshot", {}).get("description") or {}
+        datasets.append(
+            {
+                "id": node.get("id"),
+                "name": node.get("name"),
+                "description": desc_obj.get("Name"),
+            }
+        )
+
+    page_info = data.get("pageInfo", {})
+    return {"datasets": datasets, "has_next": bool(page_info.get("hasNextPage"))}
 
 
 def get_dataset_metadata(dataset_id: str) -> Dict[str, Any]:

@@ -228,7 +228,25 @@ def openneuro():
     """Display available OpenNeuro datasets."""
     search = request.args.get('q', '')
     page = request.args.get('page', 1, type=int)
-    result = openneuro_client.list_datasets(search=search, page=page)
+    all_datasets = openneuro_client.list_datasets(search_term=search)
+    per_page = 20
+    start = (page - 1) * per_page
+    end = start + per_page
+    page_datasets = all_datasets[start:end]
+    enriched = []
+    for ds in page_datasets:
+        meta = openneuro_client.get_dataset_metadata(ds['id'])
+        summary = meta.get('summary') or {}
+        enriched.append(
+            {
+                'id': ds['id'],
+                'name': meta.get('name') or ds.get('name'),
+                'description': meta.get('description'),
+                'modalities': summary.get('modalities', []),
+                'tasks': summary.get('tasks', []),
+            }
+        )
+    has_next = end < len(all_datasets)
     conn = sqlite3.connect('brainnet.db')
     cur = conn.cursor()
     cur.execute('SELECT dataset_id FROM openneuro_datasets')
@@ -236,10 +254,10 @@ def openneuro():
     conn.close()
     return render_template(
         'openneuro.html',
-        datasets=result['datasets'],
+        datasets=enriched,
         search=search,
         page=page,
-        has_next=result['has_next'],
+        has_next=has_next,
         downloaded=downloaded,
     )
 

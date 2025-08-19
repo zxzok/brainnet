@@ -2,6 +2,23 @@
 
 This project provides a modular preprocessing pipeline for functional MRI data. Several steps can optionally rely on external neuroimaging software packages. These tools are **not** bundled with the library and must be installed separately when the corresponding method is enabled.
 
+## Repository structure
+
+The library is split into small, composable modules.  Key components are:
+
+- `data_management.py` & `openneuro_client.py` – indexing BIDS datasets and
+  downloading example data from OpenNeuro.
+- `preprocessing.py` / `preprocessing_full.py` – wrapper classes for common
+  fMRI preprocessing steps such as slice‑timing, motion correction and spatial
+  normalisation.
+- `static` and `static_analysis.py` – utilities to compute ROI‑to‑ROI
+  connectivity matrices and graph‑theoretic metrics.
+- `dynamic` and `dynamic_analysis.py` – sliding‑window, HMM and
+  co‑activation‑pattern analyses for studying time‑varying connectivity.
+- `visualization.py` & `templates/` – HTML report generation.
+- `web_app.py` – a small Flask application with an SQLite backend for uploading
+  images, running analyses and viewing reports.
+
 ## Running the full pipeline
 
 The ``brainnet.main`` module ties together dataset indexing, preprocessing,
@@ -122,6 +139,25 @@ outputs = pipe.run('func.nii.gz')
 
 Enable the appropriate methods only after the corresponding software has been installed and configured.
 
+## Static connectivity
+
+Static network analysis computes a single connectivity matrix from the full
+ROI time series and extracts graph‑theoretic descriptors.  The
+``brainnet.static_analysis`` module wraps these utilities in a convenient
+``StaticAnalyzer`` class:
+
+```python
+from brainnet.static_analysis import StaticAnalyzer
+
+analyzer = StaticAnalyzer(threshold=0.2)
+conn = analyzer.compute_connectivity(roi_ts, labels)
+metrics = analyzer.compute_graph_metrics(conn)
+print(metrics.global_metrics["global_efficiency"])
+```
+
+The low‑level implementations live in the modular ``brainnet.static``
+subpackage and can be used independently for custom pipelines.
+
 ## Dynamic connectivity
 
 The `brainnet.dynamic` module performs sliding-window functional connectivity analyses. For K‑means clustering you can allow
@@ -141,3 +177,12 @@ print(model_hmm.n_states)
 ```
 
 Setting `auto_n_states=True` triggers an internal evaluation of candidate `K` values and overrides `n_states` with the best recommendation.
+
+## Web application
+
+Running ``python -m brainnet.web_app`` launches a Flask server that exposes the
+pipeline through a browser interface.  The application stores patient records
+and computed features in ``brainnet.db`` and allows uploading scans, triggering
+the preprocessing/analysis workflow in the background and downloading the
+resulting HTML report.  The same report can be retrieved programmatically via
+``/patient/<id>/report``.

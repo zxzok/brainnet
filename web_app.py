@@ -228,7 +228,8 @@ def openneuro():
     """Display available OpenNeuro datasets."""
     search = request.args.get('q', '')
     page = request.args.get('page', 1, type=int)
-    result = openneuro_client.list_datasets(search=search, page=page)
+    per_page = request.args.get('per_page', 50, type=int)
+    listing = openneuro_client.list_datasets(search=search, page=page, per_page=per_page)
     conn = sqlite3.connect('brainnet.db')
     cur = conn.cursor()
     cur.execute('SELECT dataset_id FROM openneuro_datasets')
@@ -236,10 +237,10 @@ def openneuro():
     conn.close()
     return render_template(
         'openneuro.html',
-        datasets=result['datasets'],
+        datasets=listing['datasets'],
         search=search,
         page=page,
-        has_next=result['has_next'],
+        has_next=listing['has_next'],
         downloaded=downloaded,
     )
 

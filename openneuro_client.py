@@ -50,7 +50,9 @@ def list_datasets(
     -------
     dict
         Dictionary with keys ``datasets`` and ``has_next``. ``datasets`` is a list
-        of dictionaries containing ``id``, ``name`` and ``description`` keys.
+        of dictionaries containing ``id``, ``name``, ``description`` and summary
+        fields such as ``modalities``, ``tasks``, ``sessions``, ``subjects``,
+        ``size`` and ``total_files``.
     """
     offset = max(page - 1, 0) * per_page
     after = None
@@ -61,14 +63,14 @@ def list_datasets(
         "query($first:Int!,$after:String){"
         "datasets(first:$first,after:$after,filterBy:{all:true})"
         "{pageInfo{endCursor hasNextPage}"
-        " edges{node{id name latestSnapshot{description{Name}}}}}"
+        " edges{node{id name latestSnapshot{description{Name} summary{modalities sessions subjects tasks size totalFiles}}}}}"
         "}"
     )
     query_search = (
         "query($q:String!,$first:Int!,$after:String){"
         "search(q:$q,first:$first,after:$after)"
         "{pageInfo{endCursor hasNextPage}"
-        " edges{node{id name latestSnapshot{description{Name}}}}}"
+        " edges{node{id name latestSnapshot{description{Name} summary{modalities sessions subjects tasks size totalFiles}}}}}"
         "}"
     )
 
@@ -84,12 +86,22 @@ def list_datasets(
         node = edge.get("node") if edge else None
         if not node:
             continue
-        desc_obj = node.get("latestSnapshot", {}).get("description") or {}
+        latest = node.get("latestSnapshot", {})
+        desc_obj = latest.get("description") or {}
+        summary = latest.get("summary") or {}
+        sessions = summary.get("sessions")
+        subjects = summary.get("subjects")
         datasets.append(
             {
                 "id": node.get("id"),
                 "name": node.get("name"),
                 "description": desc_obj.get("Name"),
+                "modalities": summary.get("modalities", []),
+                "tasks": summary.get("tasks", []),
+                "sessions": len(sessions) if isinstance(sessions, list) else sessions,
+                "subjects": len(subjects) if isinstance(subjects, list) else subjects,
+                "size": summary.get("size"),
+                "total_files": summary.get("totalFiles"),
             }
         )
 

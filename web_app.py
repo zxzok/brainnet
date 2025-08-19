@@ -90,15 +90,42 @@ def init_db():
     ''')
 
     # Track downloaded OpenNeuro datasets
-    cursor.execute('''
+    cursor.execute(
+        '''
         CREATE TABLE IF NOT EXISTS openneuro_datasets (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             dataset_id TEXT UNIQUE NOT NULL,
+            name TEXT,
+            description TEXT,
+            modalities TEXT,
+            tasks TEXT,
+            sessions INTEGER,
+            subjects INTEGER,
+            size INTEGER,
+            total_files INTEGER,
             path TEXT NOT NULL,
             downloaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
-    ''')
-    
+        '''
+    )
+    # Ensure newer columns exist when upgrading from older schema
+    cursor.execute('PRAGMA table_info(openneuro_datasets)')
+    existing = {row[1] for row in cursor.fetchall()}
+    required = {
+        'name': 'TEXT',
+        'description': 'TEXT',
+        'modalities': 'TEXT',
+        'tasks': 'TEXT',
+        'sessions': 'INTEGER',
+        'subjects': 'INTEGER',
+        'size': 'INTEGER',
+        'total_files': 'INTEGER',
+        'path': 'TEXT',
+    }
+    for col, col_type in required.items():
+        if col not in existing:
+            cursor.execute(f'ALTER TABLE openneuro_datasets ADD COLUMN {col} {col_type}')
+
     conn.commit()
     conn.close()
 
@@ -156,13 +183,32 @@ def process_image(image_id: int, filepath: str) -> None:
 
 def _download_openneuro_dataset(dataset_id: str) -> None:
     """Download dataset from OpenNeuro and record its path in the database."""
-
     manager = DatasetManager.fetch_from_openneuro(dataset_id)
+    metadata = openneuro_client.get_dataset_metadata(dataset_id)
+    summary = metadata.get("summary", {})
+    sessions = summary.get("sessions")
+    subjects = summary.get("subjects")
     conn = sqlite3.connect('brainnet.db')
     cur = conn.cursor()
     cur.execute(
-        'INSERT OR IGNORE INTO openneuro_datasets (dataset_id, path) VALUES (?, ?)',
-        (dataset_id, manager.root),
+        '''
+        INSERT OR REPLACE INTO openneuro_datasets (
+            dataset_id, name, description, modalities, tasks, sessions,
+            subjects, size, total_files, path
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''',
+        (
+            dataset_id,
+            metadata.get("name"),
+            metadata.get("description"),
+            json.dumps(summary.get("modalities") or []),
+            json.dumps(summary.get("tasks") or []),
+            len(sessions) if isinstance(sessions, list) else sessions,
+            len(subjects) if isinstance(subjects, list) else subjects,
+            summary.get("size"),
+            summary.get("totalFiles"),
+            manager.root,
+        ),
     )
     conn.commit()
     conn.close()
@@ -271,7 +317,7 @@ def patient_detail(patient_id):
         ORDER BY created_at DESC
     ''', (patient_id,))
     images = cursor.fetchall()
-    cursor.execute('SELECT dataset_id FROM openneuro_datasets ORDER BY downloaded_at DESC')
+    cursor.execute('SELECT dataset_id, name FROM openneuro_datasets ORDER BY downloaded_at DESC')
     on_datasets = cursor.fetchall()
 
     conn.close()

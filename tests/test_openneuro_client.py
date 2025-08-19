@@ -79,7 +79,17 @@ def test_list_datasets_search(monkeypatch):
 
     assert result == {
         "datasets": [
-            {"id": "ds-search", "name": "Search", "description": None}
+            {
+                "id": "ds-search",
+                "name": "Search",
+                "description": None,
+                "modalities": [],
+                "tasks": [],
+                "sessions": None,
+                "subjects": None,
+                "size": None,
+                "total_files": None,
+            }
         ],
         "has_next": False,
     }

@@ -21,6 +21,10 @@
                 <th>Description</th>
                 <th>Modalities</th>
                 <th>Tasks</th>
+                <th>Subjects</th>
+                <th>Sessions</th>
+                <th>Size</th>
+                <th>Files</th>
                 <th></th>
             </tr>
         </thead>
@@ -32,6 +36,10 @@
             <td>{{ ds.description }}</td>
             <td>{{ ds.modalities | join(', ') }}</td>
             <td>{{ ds.tasks | join(', ') }}</td>
+            <td>{{ ds.subjects }}</td>
+            <td>{{ ds.sessions }}</td>
+            <td>{{ ds.size }}</td>
+            <td>{{ ds.total_files }}</td>
             <td>
                 {% if ds.id in downloaded %}
                     <span class="badge bg-success">Downloaded</span>

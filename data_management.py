@@ -277,6 +277,31 @@ class DatasetIndex:
                 self._index[subject][session].append(bids_file)
 
     # -- query --------------------------------------------------------------
+    def summary(self) -> Dict[str, int]:
+        """Return summary statistics of the indexed dataset."""
+        total_subjects = len(self._subjects)
+        total_sessions = sum(
+            len(sessions) for sessions in self._index.values()
+        )
+        total_files = sum(
+            len(files)
+            for subj in self._index.values()
+            for files in subj.values()
+        )
+        func_runs = sum(
+            1
+            for subj in self._index.values()
+            for files in subj.values()
+            for f in files
+            if f.datatype == "func"
+        )
+        return {
+            "subjects": total_subjects,
+            "sessions": total_sessions,
+            "files": total_files,
+            "functional_runs": func_runs,
+        }
+
     def list_subjects(self) -> List[str]:
         """Return a sorted list of subject labels."""
 
@@ -368,44 +393,6 @@ class DatasetManager:
             download(dataset=dataset_id, target_dir=target)
         return cls(target)
 
-
-    @staticmethod
-    def fetch_from_openneuro(dataset_id: str, target_dir: str | None = None) -> str:
-        """Download a dataset from OpenNeuro and return the local path.
-
-
-        Parameters
-        ----------
-        dataset_id:
-
-            The OpenNeuro dataset identifier (e.g. ``ds000114``).
-        target_dir:
-            Directory where the dataset should be stored. If omitted, a
-            directory named after ``dataset_id`` in the current working
-            directory will be used.
-
-        Returns
-        -------
-        str
-            Absolute path to the downloaded dataset root.
-
-        Raises
-        ------
-        RuntimeError
-            If the optional ``openneuro`` dependency is not available.
-        """
-
-        try:  # pragma: no cover - external dependency
-            import openneuro
-        except ImportError as exc:  # pragma: no cover - informative error
-            raise RuntimeError(
-                "The 'openneuro' package is required to fetch datasets"
-            ) from exc
-
-        target_dir = os.path.abspath(target_dir or dataset_id)
-        # The openneuro library exposes a convenience download function.
-        openneuro.download(dataset=dataset_id, target_dir=target_dir)
-        return target_dir
 
 
 

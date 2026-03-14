@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+
+{% block title %}Data Hub - BrainNet{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2"><i class="fas fa-database"></i> Data Hub</h1>
+    <a href="{{ url_for('openneuro') }}" class="btn btn-primary">
+        <i class="fas fa-search"></i> Browse OpenNeuro
+    </a>
+</div>
+
+{% if downloads %}
+<div class="mb-4">
+    <h4>Active Downloads</h4>
+    {% for dl in downloads %}
+    <div class="alert alert-info d-flex align-items-center" id="dl-{{ dl.dataset_id }}">
+        <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+        <span>Downloading <strong>{{ dl.name }}</strong> ({{ dl.dataset_id }})...</span>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<h4 class="mb-3">Downloaded Datasets</h4>
+{% if datasets %}
+<div class="row">
+    {% for ds in datasets %}
+    <div class="col-md-4 mb-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <h5 class="card-title">{{ ds.name }}</h5>
+                <h6 class="card-subtitle mb-2 text-muted">{{ ds.dataset_id }}</h6>
+                {% if ds.description %}
+                <p class="card-text small text-truncate" title="{{ ds.description }}">{{ ds.description }}</p>
+                {% endif %}
+                <div class="mb-2">
+                    {% for mod in ds.modalities %}
+                    <span class="badge bg-info">{{ mod }}</span>
+                    {% endfor %}
+                    {% for task in ds.tasks %}
+                    <span class="badge bg-secondary">{{ task }}</span>
+                    {% endfor %}
+                </div>
+                <ul class="list-unstyled small text-muted">
+                    {% if ds.subjects %}<li><i class="fas fa-users"></i> {{ ds.subjects }} subjects</li>{% endif %}
+                    {% if ds.sessions %}<li><i class="fas fa-clock"></i> {{ ds.sessions }} sessions</li>{% endif %}
+                    {% if ds.total_files %}<li><i class="fas fa-file"></i> {{ ds.total_files }} files</li>{% endif %}
+                </ul>
+            </div>
+            <div class="card-footer d-flex justify-content-between">
+                <a href="{{ url_for('dataset_browse', dataset_id=ds.dataset_id) }}" class="btn btn-sm btn-outline-primary">
+                    <i class="fas fa-folder-open"></i> Browse
+                </a>
+                <a href="{{ url_for('openneuro_detail', dataset_id=ds.dataset_id) }}" class="btn btn-sm btn-outline-secondary">
+                    <i class="fas fa-info-circle"></i> Details
+                </a>
+                <form method="POST" action="{{ url_for('delete_dataset', dataset_id=ds.dataset_id) }}"
+                      onsubmit="return confirm('Delete this dataset and all its files from disk?')">
+                    <button type="submit" class="btn btn-sm btn-outline-danger">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="text-center py-5">
+    <i class="fas fa-database fa-3x text-muted mb-3"></i>
+    <p class="text-muted">No datasets downloaded yet.</p>
+    <a href="{{ url_for('openneuro') }}" class="btn btn-primary">
+        <i class="fas fa-search"></i> Browse OpenNeuro to get started
+    </a>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if downloads %}
+<script>
+$(function() {
+    var ids = [{% for dl in downloads %}"{{ dl.dataset_id }}"{% if not loop.last %},{% endif %}{% endfor %}];
+    if (!ids.length) return;
+    var poll = setInterval(function() {
+        var done = 0;
+        ids.forEach(function(id) {
+            $.getJSON("{{ url_for('api_download_status', dataset_id='__ID__') }}".replace('__ID__', id), function(data) {
+                if (data.status === 'completed') {
+                    $('#dl-' + id).removeClass('alert-info').addClass('alert-success')
+                        .html('<i class="fas fa-check-circle me-2"></i> <strong>' + id + '</strong> downloaded successfully. <a href="' + window.location.href + '">Refresh</a>');
+                    done++;
+                } else if (data.status === 'failed') {
+                    $('#dl-' + id).removeClass('alert-info').addClass('alert-danger')
+                        .html('<i class="fas fa-exclamation-circle me-2"></i> <strong>' + id + '</strong> download failed: ' + (data.error || 'Unknown error'));
+                    done++;
+                }
+            });
+        });
+        if (done >= ids.length) clearInterval(poll);
+    }, 3000);
+});
+</script>
+{% endif %}
+{% endblock %}

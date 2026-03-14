@@ -15,6 +15,7 @@ from flask import (
 )
 import os
 import json
+import shutil
 from datetime import datetime
 import sqlite3
 from pathlib import Path
@@ -108,6 +109,20 @@ def init_db():
         )
         '''
     )
+    # Track download attempts
+    cursor.execute(
+        '''
+        CREATE TABLE IF NOT EXISTS download_tasks (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            dataset_id TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'pending',
+            error_message TEXT,
+            started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            completed_at TIMESTAMP
+        )
+        '''
+    )
+
     # Ensure newer columns exist when upgrading from older schema
     cursor.execute('PRAGMA table_info(openneuro_datasets)')
     existing = {row[1] for row in cursor.fetchall()}
@@ -121,6 +136,7 @@ def init_db():
         'size': 'INTEGER',
         'total_files': 'INTEGER',
         'path': 'TEXT',
+        'status': 'TEXT',
     }
     for col, col_type in required.items():
         if col not in existing:
@@ -183,49 +199,105 @@ def process_image(image_id: int, filepath: str) -> None:
 
 def _download_openneuro_dataset(dataset_id: str) -> None:
     """Download dataset from OpenNeuro and record its path in the database."""
-    manager = DatasetManager.fetch_from_openneuro(dataset_id)
-    metadata = openneuro_client.get_dataset_metadata(dataset_id)
-    summary = metadata.get("summary", {})
-    sessions = summary.get("sessions")
-    subjects = summary.get("subjects")
     conn = sqlite3.connect('brainnet.db')
     cur = conn.cursor()
     cur.execute(
-        '''
-        INSERT OR REPLACE INTO openneuro_datasets (
-            dataset_id, name, description, modalities, tasks, sessions,
-            subjects, size, total_files, path
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''',
-        (
-            dataset_id,
-            metadata.get("name"),
-            metadata.get("description"),
-            json.dumps(summary.get("modalities") or []),
-            json.dumps(summary.get("tasks") or []),
-            len(sessions) if isinstance(sessions, list) else sessions,
-            len(subjects) if isinstance(subjects, list) else subjects,
-            summary.get("size"),
-            summary.get("totalFiles"),
-            manager.root,
-        ),
+        "UPDATE download_tasks SET status = 'downloading' WHERE dataset_id = ? AND status = 'pending'",
+        (dataset_id,),
     )
     conn.commit()
     conn.close()
 
+    try:
+        manager = DatasetManager.fetch_from_openneuro(dataset_id)
+        metadata = openneuro_client.get_dataset_metadata(dataset_id)
+        summary = metadata.get("summary", {})
+        sessions = summary.get("sessions")
+        subjects = summary.get("subjects")
+        conn = sqlite3.connect('brainnet.db')
+        cur = conn.cursor()
+        cur.execute(
+            '''
+            INSERT OR REPLACE INTO openneuro_datasets (
+                dataset_id, name, description, modalities, tasks, sessions,
+                subjects, size, total_files, path, status
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'ready')
+            ''',
+            (
+                dataset_id,
+                metadata.get("name"),
+                metadata.get("description"),
+                json.dumps(summary.get("modalities") or []),
+                json.dumps(summary.get("tasks") or []),
+                len(sessions) if isinstance(sessions, list) else sessions,
+                len(subjects) if isinstance(subjects, list) else subjects,
+                summary.get("size"),
+                summary.get("totalFiles"),
+                manager.root,
+            ),
+        )
+        cur.execute(
+            "UPDATE download_tasks SET status = 'completed', completed_at = CURRENT_TIMESTAMP "
+            "WHERE dataset_id = ? AND status = 'downloading'",
+            (dataset_id,),
+        )
+        conn.commit()
+        conn.close()
+    except Exception as exc:
+        conn = sqlite3.connect('brainnet.db')
+        cur = conn.cursor()
+        cur.execute(
+            "UPDATE download_tasks SET status = 'failed', error_message = ?, completed_at = CURRENT_TIMESTAMP "
+            "WHERE dataset_id = ? AND status = 'downloading'",
+            (str(exc), dataset_id),
+        )
+        cur.execute(
+            "UPDATE openneuro_datasets SET status = 'failed' WHERE dataset_id = ?",
+            (dataset_id,),
+        )
+        conn.commit()
+        conn.close()
+
 
 def _process_openneuro_for_patient(
-    patient_id: int, dataset_id: str, dataset_path: str
+    patient_id: int,
+    dataset_id: str,
+    dataset_path: str,
+    selected_subjects: list | None = None,
+    selected_runs: list | None = None,
 ) -> None:
-    """Attach dataset images to a patient and run analysis."""
+    """Attach dataset images to a patient and run analysis.
+
+    Parameters
+    ----------
+    selected_subjects : list | None
+        Subject labels to process. If *None*, falls back to the first subject.
+    selected_runs : list | None
+        Specific file paths to process. Takes priority over *selected_subjects*.
+    """
 
     manager = DatasetManager(dataset_path)
-    subjects = getattr(manager.index, "_subjects", [])
-    if not subjects:
+    all_subjects = getattr(manager.index, "_subjects", [])
+    if not all_subjects:
         return
-    subject = subjects[0]
-    runs = manager.index.get_functional_runs(subject)
-    for run in runs:
+
+    runs_to_process = []
+
+    if selected_runs:
+        # Process specific file paths chosen by the user
+        for subj in all_subjects:
+            for run in manager.index.get_functional_runs(subj):
+                if run.path in selected_runs:
+                    runs_to_process.append(run)
+    elif selected_subjects:
+        for subj in selected_subjects:
+            if subj in all_subjects:
+                runs_to_process.extend(manager.index.get_functional_runs(subj))
+    else:
+        # Legacy fallback: first subject
+        runs_to_process = manager.index.get_functional_runs(all_subjects[0])
+
+    for run in runs_to_process:
         conn = sqlite3.connect('brainnet.db')
         cur = conn.cursor()
         cur.execute(
@@ -278,26 +350,45 @@ def openneuro():
     listing = openneuro_client.list_datasets(search=search, page=page, per_page=per_page)
     conn = sqlite3.connect('brainnet.db')
     cur = conn.cursor()
-    cur.execute('SELECT dataset_id FROM openneuro_datasets')
-    downloaded = {row[0] for row in cur.fetchall()}
+    cur.execute('SELECT dataset_id, status FROM openneuro_datasets')
+    rows = cur.fetchall()
+    downloaded = {row[0] for row in rows if row[1] == 'ready'}
+    downloading = {row[0] for row in rows if row[1] == 'downloading'}
     conn.close()
     return render_template(
         'openneuro.html',
-
         datasets=listing['datasets'],
         search=search,
         page=page,
         has_next=listing['has_next'],
-
         downloaded=downloaded,
+        downloading=downloading,
     )
 
 
 @app.route('/openneuro/download', methods=['POST'])
 def download_openneuro():
     dataset_id = request.form['dataset_id']
+    conn = sqlite3.connect('brainnet.db')
+    cur = conn.cursor()
+    # Record the download task
+    cur.execute(
+        "INSERT INTO download_tasks (dataset_id, status) VALUES (?, 'pending')",
+        (dataset_id,),
+    )
+    # Pre-create openneuro_datasets row with downloading status
+    cur.execute(
+        "INSERT OR IGNORE INTO openneuro_datasets (dataset_id, path, status) VALUES (?, '', 'downloading')",
+        (dataset_id,),
+    )
+    cur.execute(
+        "UPDATE openneuro_datasets SET status = 'downloading' WHERE dataset_id = ?",
+        (dataset_id,),
+    )
+    conn.commit()
+    conn.close()
     executor.submit(_download_openneuro_dataset, dataset_id)
-    return redirect(url_for('openneuro'))
+    return redirect(url_for('openneuro_detail', dataset_id=dataset_id))
 
 @app.route('/patient/<int:patient_id>')
 def patient_detail(patient_id):
@@ -518,13 +609,22 @@ def use_openneuro(patient_id):
     """Process a downloaded OpenNeuro dataset for this patient."""
 
     dataset_id = request.form['dataset_id']
+    selected_subjects = request.form.getlist('subjects')
+    selected_runs = request.form.getlist('runs')
     conn = sqlite3.connect('brainnet.db')
     cur = conn.cursor()
     cur.execute('SELECT path FROM openneuro_datasets WHERE dataset_id = ?', (dataset_id,))
     row = cur.fetchone()
     conn.close()
     if row:
-        executor.submit(_process_openneuro_for_patient, patient_id, dataset_id, row[0])
+        executor.submit(
+            _process_openneuro_for_patient,
+            patient_id,
+            dataset_id,
+            row[0],
+            selected_subjects=selected_subjects or None,
+            selected_runs=selected_runs or None,
+        )
     return redirect(url_for('patient_detail', patient_id=patient_id))
 
 @app.route('/delete_image/<int:image_id>', methods=['POST'])
@@ -706,6 +806,240 @@ def api_network_data():
             ]
         }
     return jsonify(data)
+
+@app.route('/data')
+def data_hub():
+    """Data Hub landing page showing downloaded datasets and active downloads."""
+    conn = sqlite3.connect('brainnet.db')
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT dataset_id, name, description, modalities, tasks, sessions, subjects, size, total_files "
+        "FROM openneuro_datasets WHERE status = 'ready' ORDER BY downloaded_at DESC"
+    )
+    ready = cur.fetchall()
+    cur.execute(
+        "SELECT dataset_id, name FROM openneuro_datasets WHERE status = 'downloading'"
+    )
+    active = cur.fetchall()
+    conn.close()
+
+    datasets = []
+    for row in ready:
+        modalities = []
+        tasks = []
+        try:
+            modalities = json.loads(row[3]) if row[3] else []
+        except (json.JSONDecodeError, TypeError):
+            pass
+        try:
+            tasks = json.loads(row[4]) if row[4] else []
+        except (json.JSONDecodeError, TypeError):
+            pass
+        datasets.append({
+            'dataset_id': row[0],
+            'name': row[1] or row[0],
+            'description': row[2],
+            'modalities': modalities,
+            'tasks': tasks,
+            'sessions': row[5],
+            'subjects': row[6],
+            'size': row[7],
+            'total_files': row[8],
+        })
+
+    downloads = [{'dataset_id': r[0], 'name': r[1] or r[0]} for r in active]
+    return render_template('data_hub.html', datasets=datasets, downloads=downloads)
+
+
+@app.route('/openneuro/<dataset_id>')
+def openneuro_detail(dataset_id):
+    """Detail page for an OpenNeuro dataset."""
+    conn = sqlite3.connect('brainnet.db')
+    cur = conn.cursor()
+    cur.execute(
+        'SELECT dataset_id, name, description, modalities, tasks, sessions, subjects, size, total_files, status '
+        'FROM openneuro_datasets WHERE dataset_id = ?',
+        (dataset_id,),
+    )
+    local = cur.fetchone()
+    conn.close()
+
+    local_status = local[9] if local else None
+
+    # Always fetch fresh metadata from OpenNeuro API
+    try:
+        metadata = openneuro_client.get_dataset_metadata(dataset_id)
+        summary = metadata.get('summary', {})
+        sessions = summary.get('sessions')
+        subjects = summary.get('subjects')
+        ds_info = {
+            'id': dataset_id,
+            'name': metadata.get('name') or (local[1] if local else dataset_id),
+            'description': metadata.get('description') or (local[2] if local else ''),
+            'modalities': summary.get('modalities', []),
+            'tasks': summary.get('tasks', []),
+            'sessions': len(sessions) if isinstance(sessions, list) else sessions,
+            'subjects': len(subjects) if isinstance(subjects, list) else subjects,
+            'size': summary.get('size'),
+            'total_files': summary.get('totalFiles'),
+        }
+    except Exception:
+        # Fallback to local data if API fails
+        if local:
+            modalities = []
+            tasks = []
+            try:
+                modalities = json.loads(local[3]) if local[3] else []
+            except (json.JSONDecodeError, TypeError):
+                pass
+            try:
+                tasks = json.loads(local[4]) if local[4] else []
+            except (json.JSONDecodeError, TypeError):
+                pass
+            ds_info = {
+                'id': dataset_id,
+                'name': local[1] or dataset_id,
+                'description': local[2] or '',
+                'modalities': modalities,
+                'tasks': tasks,
+                'sessions': local[5],
+                'subjects': local[6],
+                'size': local[7],
+                'total_files': local[8],
+            }
+        else:
+            ds_info = {'id': dataset_id, 'name': dataset_id, 'description': '',
+                       'modalities': [], 'tasks': [], 'sessions': None,
+                       'subjects': None, 'size': None, 'total_files': None}
+
+    return render_template(
+        'openneuro_detail.html', dataset=ds_info, status=local_status,
+    )
+
+
+@app.route('/api/download_status/<dataset_id>')
+def api_download_status(dataset_id):
+    """Return current download status as JSON for polling."""
+    conn = sqlite3.connect('brainnet.db')
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT status, error_message FROM download_tasks WHERE dataset_id = ? ORDER BY id DESC LIMIT 1",
+        (dataset_id,),
+    )
+    row = cur.fetchone()
+    conn.close()
+    if row:
+        return jsonify({'status': row[0], 'error': row[1]})
+    return jsonify({'status': 'unknown', 'error': None})
+
+
+@app.route('/openneuro/<dataset_id>/browse')
+def dataset_browse(dataset_id):
+    """Browse the contents of a downloaded dataset."""
+    conn = sqlite3.connect('brainnet.db')
+    cur = conn.cursor()
+    cur.execute(
+        'SELECT path, name FROM openneuro_datasets WHERE dataset_id = ? AND status = ?',
+        (dataset_id, 'ready'),
+    )
+    row = cur.fetchone()
+    if not row:
+        conn.close()
+        return "Dataset not found or not yet downloaded", 404
+
+    dataset_path, dataset_name = row[0], row[1]
+
+    # Get patients for the analysis form
+    cur.execute('SELECT id, patient_id, name FROM patients ORDER BY name')
+    patients = cur.fetchall()
+    conn.close()
+
+    from data_management import DatasetIndex
+    try:
+        index = DatasetIndex(dataset_path, datatypes=['func', 'anat', 'dwi'])
+    except Exception:
+        index = DatasetIndex(dataset_path)
+
+    subjects_data = []
+    for subj in index.list_subjects():
+        sessions = index.list_sessions(subj)
+        sess_data = []
+        for ses in sessions:
+            runs = []
+            for dtype in index.datatypes:
+                try:
+                    files = index.get_files(dtype, subj, session=ses)
+                except KeyError:
+                    files = []
+                for f in files:
+                    runs.append({
+                        'path': f.path,
+                        'task': f.task,
+                        'run': f.run,
+                        'suffix': f.suffix,
+                        'datatype': f.datatype,
+                    })
+            sess_data.append({'session': ses, 'runs': runs})
+        subjects_data.append({'subject': subj, 'sessions': sess_data})
+
+    ds_summary = index.summary()
+
+    return render_template(
+        'dataset_browse.html',
+        dataset_id=dataset_id,
+        dataset_name=dataset_name or dataset_id,
+        subjects=subjects_data,
+        summary=ds_summary,
+        patients=patients,
+    )
+
+
+@app.route('/openneuro/<dataset_id>/delete', methods=['POST'])
+def delete_dataset(dataset_id):
+    """Delete a downloaded dataset from disk and database."""
+    conn = sqlite3.connect('brainnet.db')
+    cur = conn.cursor()
+    cur.execute('SELECT path FROM openneuro_datasets WHERE dataset_id = ?', (dataset_id,))
+    row = cur.fetchone()
+    if row and row[0]:
+        try:
+            shutil.rmtree(row[0])
+        except OSError:
+            pass
+    cur.execute('DELETE FROM openneuro_datasets WHERE dataset_id = ?', (dataset_id,))
+    cur.execute('DELETE FROM download_tasks WHERE dataset_id = ?', (dataset_id,))
+    conn.commit()
+    conn.close()
+    return redirect(url_for('data_hub'))
+
+
+@app.route('/openneuro/<dataset_id>/analyze', methods=['POST'])
+def analyze_dataset(dataset_id):
+    """Run analysis on selected runs from a dataset for a patient."""
+    patient_id = request.form.get('patient_id', type=int)
+    selected_runs = request.form.getlist('runs')
+
+    if not patient_id:
+        return "Patient is required", 400
+
+    conn = sqlite3.connect('brainnet.db')
+    cur = conn.cursor()
+    cur.execute('SELECT path FROM openneuro_datasets WHERE dataset_id = ?', (dataset_id,))
+    row = cur.fetchone()
+    conn.close()
+
+    if not row:
+        return "Dataset not found", 404
+
+    executor.submit(
+        _process_openneuro_for_patient,
+        patient_id,
+        dataset_id,
+        row[0],
+        selected_runs=selected_runs or None,
+    )
+    return redirect(url_for('patient_detail', patient_id=patient_id))
+
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=6525)

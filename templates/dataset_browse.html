@@ -1,0 +1,187 @@
+{% extends "base.html" %}
+
+{% block title %}Browse {{ dataset_name }} - BrainNet{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <div>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb mb-1">
+                <li class="breadcrumb-item"><a href="{{ url_for('data_hub') }}">Data Hub</a></li>
+                <li class="breadcrumb-item"><a href="{{ url_for('openneuro_detail', dataset_id=dataset_id) }}">{{ dataset_id }}</a></li>
+                <li class="breadcrumb-item active">Browse</li>
+            </ol>
+        </nav>
+        <h1 class="h2"><i class="fas fa-folder-open"></i> {{ dataset_name }}</h1>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <div class="row text-center">
+            <div class="col">
+                <h4 class="mb-0">{{ summary.subjects }}</h4>
+                <small class="text-muted">Subjects</small>
+            </div>
+            <div class="col">
+                <h4 class="mb-0">{{ summary.sessions }}</h4>
+                <small class="text-muted">Sessions</small>
+            </div>
+            <div class="col">
+                <h4 class="mb-0">{{ summary.functional_runs }}</h4>
+                <small class="text-muted">Functional Runs</small>
+            </div>
+            <div class="col">
+                <h4 class="mb-0">{{ summary.files }}</h4>
+                <small class="text-muted">Total Files</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<form method="POST" action="{{ url_for('analyze_dataset', dataset_id=dataset_id) }}" id="analyze-form">
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header"><h5 class="mb-0">Select Patient</h5></div>
+                <div class="card-body">
+                    {% if patients %}
+                    <select name="patient_id" class="form-select" required>
+                        <option value="">-- Select a patient --</option>
+                        {% for p in patients %}
+                        <option value="{{ p[0] }}">{{ p[1] }} - {{ p[2] }}</option>
+                        {% endfor %}
+                    </select>
+                    {% else %}
+                    <p class="text-muted mb-0">No patients found. <a href="{{ url_for('add_patient') }}">Add a patient</a> first.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header"><h5 class="mb-0">Selection</h5></div>
+                <div class="card-body d-flex align-items-center justify-content-between">
+                    <span id="selection-count">0 runs selected</span>
+                    <div>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" id="select-all">Select All</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" id="deselect-all">Deselect All</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Subjects & Runs</h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="accordion" id="subjects-accordion">
+                {% for subj in subjects %}
+                <div class="accordion-item">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button"
+                                data-bs-toggle="collapse" data-bs-target="#subj-{{ subj.subject }}">
+                            <i class="fas fa-user me-2"></i> Subject {{ subj.subject }}
+                            <span class="badge bg-primary ms-2">
+                                {% set ns = namespace(count=0) %}
+                                {% for ses in subj.sessions %}{% for r in ses.runs %}{% if r.datatype == 'func' %}{% set ns.count = ns.count + 1 %}{% endif %}{% endfor %}{% endfor %}
+                                {{ ns.count }} functional runs
+                            </span>
+                        </button>
+                    </h2>
+                    <div id="subj-{{ subj.subject }}" class="accordion-collapse collapse"
+                         data-bs-parent="#subjects-accordion">
+                        <div class="accordion-body p-0">
+                            {% for ses in subj.sessions %}
+                            {% if ses.session %}
+                            <div class="px-3 py-2 bg-light border-bottom">
+                                <strong><i class="fas fa-clock"></i> Session {{ ses.session }}</strong>
+                            </div>
+                            {% endif %}
+                            {% if ses.runs %}
+                            <div class="table-responsive">
+                                <table class="table table-hover mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th style="width: 40px;"></th>
+                                            <th>Datatype</th>
+                                            <th>Task</th>
+                                            <th>Run</th>
+                                            <th>Suffix</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for run in ses.runs %}
+                                        <tr>
+                                            <td>
+                                                {% if run.datatype == 'func' %}
+                                                <input type="checkbox" name="runs" value="{{ run.path }}"
+                                                       class="form-check-input run-checkbox">
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {% if run.datatype == 'func' %}
+                                                <span class="badge bg-success">func</span>
+                                                {% elif run.datatype == 'anat' %}
+                                                <span class="badge bg-warning text-dark">anat</span>
+                                                {% elif run.datatype == 'dwi' %}
+                                                <span class="badge bg-info">dwi</span>
+                                                {% else %}
+                                                <span class="badge bg-secondary">{{ run.datatype }}</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>{{ run.task or '-' }}</td>
+                                            <td>{{ run.run or '-' }}</td>
+                                            <td>{{ run.suffix }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% else %}
+                            <div class="p-3 text-muted">No imaging files found.</div>
+                            {% endif %}
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <div class="d-grid">
+        <button type="submit" class="btn btn-lg btn-primary" id="run-analysis-btn" disabled>
+            <i class="fas fa-play"></i> Run Analysis on Selected Runs
+        </button>
+    </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+$(function() {
+    function updateCount() {
+        var count = $('.run-checkbox:checked').length;
+        $('#selection-count').text(count + ' run' + (count !== 1 ? 's' : '') + ' selected');
+        var patientSelected = $('select[name="patient_id"]').val();
+        $('#run-analysis-btn').prop('disabled', count === 0 || !patientSelected);
+    }
+
+    $('.run-checkbox').on('change', updateCount);
+    $('select[name="patient_id"]').on('change', updateCount);
+
+    $('#select-all').on('click', function() {
+        $('.run-checkbox').prop('checked', true);
+        updateCount();
+    });
+
+    $('#deselect-all').on('click', function() {
+        $('.run-checkbox').prop('checked', false);
+        updateCount();
+    });
+});
+</script>
+{% endblock %}

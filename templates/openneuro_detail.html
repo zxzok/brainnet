@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+
+{% block title %}{{ dataset.name }} - OpenNeuro - BrainNet{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <div>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb mb-1">
+                <li class="breadcrumb-item"><a href="{{ url_for('data_hub') }}">Data Hub</a></li>
+                <li class="breadcrumb-item"><a href="{{ url_for('openneuro') }}">OpenNeuro</a></li>
+                <li class="breadcrumb-item active">{{ dataset.id }}</li>
+            </ol>
+        </nav>
+        <h1 class="h2">{{ dataset.name or dataset.id }}</h1>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card mb-4">
+            <div class="card-header"><h5 class="mb-0">Dataset Information</h5></div>
+            <div class="card-body">
+                {% if dataset.description %}
+                <p>{{ dataset.description }}</p>
+                {% endif %}
+
+                <dl class="row mb-0">
+                    <dt class="col-sm-3">Dataset ID</dt>
+                    <dd class="col-sm-9">
+                        {{ dataset.id }}
+                        <a href="https://openneuro.org/datasets/{{ dataset.id }}" target="_blank" class="ms-2 small">
+                            <i class="fas fa-external-link-alt"></i> View on OpenNeuro
+                        </a>
+                    </dd>
+
+                    {% if dataset.modalities %}
+                    <dt class="col-sm-3">Modalities</dt>
+                    <dd class="col-sm-9">
+                        {% for mod in dataset.modalities %}
+                        <span class="badge bg-info">{{ mod }}</span>
+                        {% endfor %}
+                    </dd>
+                    {% endif %}
+
+                    {% if dataset.tasks %}
+                    <dt class="col-sm-3">Tasks</dt>
+                    <dd class="col-sm-9">
+                        {% for task in dataset.tasks %}
+                        <span class="badge bg-secondary">{{ task }}</span>
+                        {% endfor %}
+                    </dd>
+                    {% endif %}
+
+                    {% if dataset.subjects is not none %}
+                    <dt class="col-sm-3">Subjects</dt>
+                    <dd class="col-sm-9">{{ dataset.subjects }}</dd>
+                    {% endif %}
+
+                    {% if dataset.sessions is not none %}
+                    <dt class="col-sm-3">Sessions</dt>
+                    <dd class="col-sm-9">{{ dataset.sessions }}</dd>
+                    {% endif %}
+
+                    {% if dataset.total_files is not none %}
+                    <dt class="col-sm-3">Total Files</dt>
+                    <dd class="col-sm-9">{{ dataset.total_files }}</dd>
+                    {% endif %}
+
+                    {% if dataset.size is not none %}
+                    <dt class="col-sm-3">Size</dt>
+                    <dd class="col-sm-9">{{ "%.1f"|format(dataset.size / 1073741824) }} GB</dd>
+                    {% endif %}
+                </dl>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card mb-4">
+            <div class="card-header"><h5 class="mb-0">Actions</h5></div>
+            <div class="card-body" id="actions-panel">
+                {% if status == 'ready' %}
+                <a href="{{ url_for('dataset_browse', dataset_id=dataset.id) }}" class="btn btn-primary w-100 mb-2">
+                    <i class="fas fa-folder-open"></i> Browse Contents
+                </a>
+                <form method="POST" action="{{ url_for('delete_dataset', dataset_id=dataset.id) }}"
+                      onsubmit="return confirm('Delete this dataset and all its files from disk?')">
+                    <button type="submit" class="btn btn-outline-danger w-100">
+                        <i class="fas fa-trash"></i> Delete Dataset
+                    </button>
+                </form>
+
+                {% elif status == 'downloading' %}
+                <div class="text-center" id="download-status">
+                    <div class="spinner-border text-primary mb-2" role="status"></div>
+                    <p class="text-muted">Downloading dataset...</p>
+                </div>
+
+                {% elif status == 'failed' %}
+                <div class="alert alert-danger mb-2">
+                    <i class="fas fa-exclamation-circle"></i> Download failed.
+                </div>
+                <form method="POST" action="{{ url_for('download_openneuro') }}">
+                    <input type="hidden" name="dataset_id" value="{{ dataset.id }}">
+                    <button type="submit" class="btn btn-warning w-100">
+                        <i class="fas fa-redo"></i> Retry Download
+                    </button>
+                </form>
+
+                {% else %}
+                <form method="POST" action="{{ url_for('download_openneuro') }}">
+                    <input type="hidden" name="dataset_id" value="{{ dataset.id }}">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-download"></i> Download Dataset
+                    </button>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% if status == 'downloading' %}
+<script>
+$(function() {
+    var poll = setInterval(function() {
+        $.getJSON("{{ url_for('api_download_status', dataset_id=dataset.id) }}", function(data) {
+            if (data.status === 'completed') {
+                clearInterval(poll);
+                $('#download-status').html(
+                    '<div class="alert alert-success"><i class="fas fa-check-circle"></i> Download complete!</div>' +
+                    '<a href="{{ url_for("dataset_browse", dataset_id=dataset.id) }}" class="btn btn-primary w-100">' +
+                    '<i class="fas fa-folder-open"></i> Browse Contents</a>'
+                );
+            } else if (data.status === 'failed') {
+                clearInterval(poll);
+                $('#download-status').html(
+                    '<div class="alert alert-danger"><i class="fas fa-exclamation-circle"></i> Download failed: ' +
+                    (data.error || 'Unknown error') + '</div>' +
+                    '<form method="POST" action="{{ url_for("download_openneuro") }}">' +
+                    '<input type="hidden" name="dataset_id" value="{{ dataset.id }}">' +
+                    '<button type="submit" class="btn btn-warning w-100"><i class="fas fa-redo"></i> Retry</button></form>'
+                );
+            }
+        });
+    }, 3000);
+});
+</script>
+{% endif %}
+{% endblock %}

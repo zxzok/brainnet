@@ -49,12 +49,40 @@ class DynamicMetrics:
         state ``j``.  Rows sum to one for states that are visited.
     n_transitions : int
         Total number of state changes observed in the sequence.
+    dwell_time_std : np.ndarray
+        Standard deviation of dwell times per state.  Shape ``(n_states,)``.
+    max_dwell_time : np.ndarray
+        Maximum consecutive duration per state.  Shape ``(n_states,)``.
+    occupancy_entropy : float
+        Shannon entropy of the occupancy distribution.  Higher values
+        indicate more uniform state usage.
+    transition_entropy : float
+        Entropy of the transition probability matrix, measuring the
+        predictability of state transitions.
+    mean_recurrence_interval : np.ndarray
+        Average number of time steps between consecutive visits to
+        each state.  Shape ``(n_states,)``.
+    switching_rate : float
+        Fraction of time points at which a state change occurs.
+    state_complexity : float
+        Lempel-Ziv complexity of the state sequence, normalized to [0, 1].
+        Higher values indicate less repetitive temporal patterns.
+    temporal_autocorrelation : float
+        Lag-1 autocorrelation of the state sequence.
     """
 
     occupancy: np.ndarray
     mean_dwell_time: np.ndarray
     transition_matrix: np.ndarray
     n_transitions: int
+    dwell_time_std: np.ndarray = field(default_factory=lambda: np.array([]))
+    max_dwell_time: np.ndarray = field(default_factory=lambda: np.array([]))
+    occupancy_entropy: float = 0.0
+    transition_entropy: float = 0.0
+    mean_recurrence_interval: np.ndarray = field(default_factory=lambda: np.array([]))
+    switching_rate: float = 0.0
+    state_complexity: float = 0.0
+    temporal_autocorrelation: float = 0.0
 
 
 @dataclass

@@ -228,25 +228,66 @@ def process_image(image_id: int, filepath: str) -> None:
             )
 
         # Store dynamic metrics
-        for idx, occ in enumerate(dyn_result.metrics.occupancy):
+        dm = dyn_result.metrics
+        for idx, occ in enumerate(dm.occupancy):
             cur.execute(
                 'INSERT INTO features (image_id, feature_name, feature_value, feature_type) VALUES (?, ?, ?, ?)',
                 (image_id, f"state_{idx}_occupancy", float(occ), 'dynamic'),
             )
-        if hasattr(dyn_result.metrics, 'dwell_time') and dyn_result.metrics.dwell_time is not None:
-            for idx, dt in enumerate(dyn_result.metrics.dwell_time):
+        for idx, dt in enumerate(dm.mean_dwell_time):
+            cur.execute(
+                'INSERT INTO features (image_id, feature_name, feature_value, feature_type) VALUES (?, ?, ?, ?)',
+                (image_id, f"state_{idx}_dwell_time", float(dt), 'dynamic'),
+            )
+        for idx, ds in enumerate(dm.dwell_time_std):
+            cur.execute(
+                'INSERT INTO features (image_id, feature_name, feature_value, feature_type) VALUES (?, ?, ?, ?)',
+                (image_id, f"state_{idx}_dwell_time_std", float(ds), 'dynamic'),
+            )
+        for idx, md in enumerate(dm.max_dwell_time):
+            cur.execute(
+                'INSERT INTO features (image_id, feature_name, feature_value, feature_type) VALUES (?, ?, ?, ?)',
+                (image_id, f"state_{idx}_max_dwell_time", float(md), 'dynamic'),
+            )
+        for idx, ri in enumerate(dm.mean_recurrence_interval):
+            cur.execute(
+                'INSERT INTO features (image_id, feature_name, feature_value, feature_type) VALUES (?, ?, ?, ?)',
+                (image_id, f"state_{idx}_recurrence_interval", float(ri), 'dynamic'),
+            )
+        tp = dm.transition_matrix
+        for i in range(tp.shape[0]):
+            for j in range(tp.shape[1]):
                 cur.execute(
                     'INSERT INTO features (image_id, feature_name, feature_value, feature_type) VALUES (?, ?, ?, ?)',
-                    (image_id, f"state_{idx}_dwell_time", float(dt), 'dynamic'),
+                    (image_id, f"transition_{i}_to_{j}", float(tp[i, j]), 'dynamic'),
                 )
-        if hasattr(dyn_result.metrics, 'transition_probs') and dyn_result.metrics.transition_probs is not None:
-            tp = dyn_result.metrics.transition_probs
-            for i in range(tp.shape[0]):
-                for j in range(tp.shape[1]):
+
+        # Store global dynamic summary metrics
+        for name, value in [
+            ('occupancy_entropy', dm.occupancy_entropy),
+            ('transition_entropy', dm.transition_entropy),
+            ('switching_rate', dm.switching_rate),
+            ('state_complexity', dm.state_complexity),
+            ('temporal_autocorrelation', dm.temporal_autocorrelation),
+            ('n_transitions', float(dm.n_transitions)),
+        ]:
+            cur.execute(
+                'INSERT INTO features (image_id, feature_name, feature_value, feature_type) VALUES (?, ?, ?, ?)',
+                (image_id, name, float(value), 'dynamic'),
+            )
+
+        # Compute per-state graph features
+        try:
+            from dynamic.state_features import compute_state_features
+            state_graph_features = compute_state_features(dyn_result.states)
+            for state_idx, feat_dict in enumerate(state_graph_features):
+                for feat_name, feat_val in feat_dict.items():
                     cur.execute(
                         'INSERT INTO features (image_id, feature_name, feature_value, feature_type) VALUES (?, ?, ?, ?)',
-                        (image_id, f"transition_{i}_to_{j}", float(tp[i, j]), 'dynamic'),
+                        (image_id, f"state_{state_idx}_{feat_name}", float(feat_val), 'dynamic'),
                     )
+        except (ImportError, NotImplementedError):
+            pass  # networkx not available; skip per-state graph features
 
         # Store connectivity matrix as JSON blob for visualization
         conn_json = json.dumps(conn_matrix.matrix.tolist())

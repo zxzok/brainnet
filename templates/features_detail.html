@@ -61,6 +61,7 @@
                 {% endif %}
                 {% if dynamic_features %}
                 <div id="occupancy-chart" style="width:100%; height:230px;"></div>
+                <div id="dwell-chart" style="width:100%; height:230px;"></div>
                 {% endif %}
             </div>
         </div>
@@ -94,16 +95,33 @@
     {% endif %}
 
     {% if dynamic_features %}
+    {# Separate dynamic features into categories #}
+    {% set global_dynamic = [] %}
+    {% set per_state_temporal = [] %}
+    {% set transition_metrics = [] %}
+    {% set per_state_graph = [] %}
+    {% for f in dynamic_features %}
+        {% if f.name.startswith('transition_') %}
+            {% if transition_metrics.append(f) %}{% endif %}
+        {% elif f.name.startswith('state_') and ('occupancy' in f.name or 'dwell' in f.name or 'recurrence' in f.name or 'max_dwell' in f.name) %}
+            {% if per_state_temporal.append(f) %}{% endif %}
+        {% elif f.name.startswith('state_') and ('efficiency' in f.name or 'modularity' in f.name or 'connectivity' in f.name or 'density' in f.name or 'clustering' in f.name or 'assortativity' in f.name or 'path_length' in f.name or 'small_world' in f.name or 'centrality' in f.name or 'participation' in f.name) %}
+            {% if per_state_graph.append(f) %}{% endif %}
+        {% else %}
+            {% if global_dynamic.append(f) %}{% endif %}
+        {% endif %}
+    {% endfor %}
+
     <div class="col-md-6 mb-4">
         <div class="card">
             <div class="card-header">
-                <h5 class="mb-0"><i class="fas fa-exchange-alt"></i> Dynamic Metrics</h5>
+                <h5 class="mb-0"><i class="fas fa-chart-line"></i> Dynamic Summary Metrics</h5>
             </div>
             <div class="card-body p-0">
                 <table class="table table-striped mb-0">
                     <thead><tr><th>Metric</th><th>Value</th></tr></thead>
                     <tbody>
-                    {% for f in dynamic_features %}
+                    {% for f in global_dynamic %}
                     <tr>
                         <td>{{ f.name }}</td>
                         <td><code>{{ "%.6f"|format(f.value) }}</code></td>
@@ -114,8 +132,99 @@
             </div>
         </div>
     </div>
+</div>
+
+<div class="row">
+    {% if per_state_temporal %}
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="fas fa-exchange-alt"></i> Per-State Temporal Metrics</h5>
+                <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#per-state-temporal">
+                    Show/Hide ({{ per_state_temporal|length }})
+                </button>
+            </div>
+            <div class="collapse show" id="per-state-temporal">
+                <div class="card-body p-0">
+                    <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                        <table class="table table-sm table-striped mb-0">
+                            <thead><tr><th>Metric</th><th>Value</th></tr></thead>
+                            <tbody>
+                            {% for f in per_state_temporal %}
+                            <tr>
+                                <td>{{ f.name }}</td>
+                                <td><code>{{ "%.6f"|format(f.value) }}</code></td>
+                            </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if transition_metrics %}
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="fas fa-arrows-alt"></i> Transition Probabilities</h5>
+                <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#transition-metrics">
+                    Show/Hide ({{ transition_metrics|length }})
+                </button>
+            </div>
+            <div class="collapse" id="transition-metrics">
+                <div class="card-body p-0">
+                    <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                        <table class="table table-sm table-striped mb-0">
+                            <thead><tr><th>Transition</th><th>Probability</th></tr></thead>
+                            <tbody>
+                            {% for f in transition_metrics %}
+                            <tr>
+                                <td>{{ f.name }}</td>
+                                <td><code>{{ "%.6f"|format(f.value) }}</code></td>
+                            </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
     {% endif %}
 </div>
+
+{% if per_state_graph %}
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="fas fa-sitemap"></i> Per-State Graph Metrics</h5>
+        <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#per-state-graph">
+            Show/Hide ({{ per_state_graph|length }})
+        </button>
+    </div>
+    <div class="collapse show" id="per-state-graph">
+        <div class="card-body p-0">
+            <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                <table class="table table-sm table-striped mb-0">
+                    <thead><tr><th>State / Metric</th><th>Value</th></tr></thead>
+                    <tbody>
+                    {% for f in per_state_graph %}
+                    <tr>
+                        <td>{{ f.name }}</td>
+                        <td><code>{{ "%.6f"|format(f.value) }}</code></td>
+                    </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+    {% endif %}
 
 {% if static_node_features %}
 <div class="card mb-4">
@@ -202,23 +311,45 @@ $(function() {
 
     // Occupancy bar chart
     var occFeatures = [];
+    var dwellFeatures = [];
     {% for f in dynamic_features %}
-    {% if 'occupancy' in f.name %}
+    {% if f.name.endswith('_occupancy') %}
     occFeatures.push({name: '{{ f.name }}', value: {{ f.value }}});
     {% endif %}
+    {% if f.name.endswith('_dwell_time') and not f.name.endswith('_max_dwell_time') and not f.name.endswith('_dwell_time_std') %}
+    dwellFeatures.push({name: '{{ f.name }}', value: {{ f.value }}});
+    {% endif %}
     {% endfor %}
+
+    var stateColors = ['#4e79a7', '#f28e2b', '#e15759', '#76b7b2', '#59a14f', '#edc948'];
 
     if (occFeatures.length > 0 && document.getElementById('occupancy-chart')) {
         var barData = [{
             x: occFeatures.map(function(f) { return f.name.replace('_occupancy', '').replace('state_', 'State '); }),
             y: occFeatures.map(function(f) { return f.value; }),
             type: 'bar',
-            marker: {color: ['#4e79a7', '#f28e2b', '#e15759', '#76b7b2', '#59a14f', '#edc948']}
+            marker: {color: stateColors.slice(0, occFeatures.length)}
         }];
         Plotly.newPlot('occupancy-chart', barData, {
             title: 'State Occupancy',
             xaxis: {title: ''},
             yaxis: {title: 'Fraction', range: [0, 1]},
+            margin: {l: 50, r: 20, t: 40, b: 40}
+        }, {responsive: true});
+    }
+
+    // Dwell time bar chart
+    if (dwellFeatures.length > 0 && document.getElementById('dwell-chart')) {
+        var dwellData = [{
+            x: dwellFeatures.map(function(f) { return f.name.replace('_dwell_time', '').replace('state_', 'State '); }),
+            y: dwellFeatures.map(function(f) { return f.value; }),
+            type: 'bar',
+            marker: {color: stateColors.slice(0, dwellFeatures.length)}
+        }];
+        Plotly.newPlot('dwell-chart', dwellData, {
+            title: 'Mean Dwell Time',
+            xaxis: {title: ''},
+            yaxis: {title: 'Windows'},
             margin: {l: 50, r: 20, t: 40, b: 40}
         }, {responsive: true});
     }

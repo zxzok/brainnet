@@ -1,0 +1,227 @@
+{% extends "base.html" %}
+
+{% block title %}Features - {{ image[4] }} - BrainNet{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <div>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb mb-1">
+                <li class="breadcrumb-item"><a href="{{ url_for('patient_detail', patient_id=image[5]) }}">{{ image[4] }}</a></li>
+                <li class="breadcrumb-item active">Features</li>
+            </ol>
+        </nav>
+        <h1 class="h2"><i class="fas fa-chart-bar"></i> Analysis Results</h1>
+        <small class="text-muted">{{ image[3] or image[1] }}</small>
+    </div>
+    <div class="btn-toolbar">
+        <form method="POST" action="{{ url_for('recompute_features', image_id=image[0]) }}" class="me-2">
+            <button type="submit" class="btn btn-warning btn-sm">
+                <i class="fas fa-redo"></i> Recompute
+            </button>
+        </form>
+        <a href="{{ url_for('export_features', image_id=image[0]) }}" class="btn btn-outline-secondary btn-sm me-2">
+            <i class="fas fa-download"></i> Export JSON
+        </a>
+        <form method="POST" action="{{ url_for('delete_features', image_id=image[0]) }}"
+              onsubmit="return confirm('Delete all computed features for this image?')">
+            <button type="submit" class="btn btn-outline-danger btn-sm">
+                <i class="fas fa-trash"></i> Delete Features
+            </button>
+        </form>
+    </div>
+</div>
+
+{% if errors %}
+<div class="alert alert-danger">
+    <h5><i class="fas fa-exclamation-triangle"></i> Analysis Errors</h5>
+    {% for err in errors %}
+    <p class="mb-0"><code>{{ err.message }}</code> <small class="text-muted">({{ err.time }})</small></p>
+    {% endfor %}
+</div>
+{% endif %}
+
+{% if conn_matrix != 'null' %}
+<!-- Visualization Section -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header"><h5 class="mb-0"><i class="fas fa-th"></i> Connectivity Matrix</h5></div>
+            <div class="card-body">
+                <div id="conn-heatmap" style="width:100%; height:450px;"></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header"><h5 class="mb-0"><i class="fas fa-wave-square"></i> Dynamic States</h5></div>
+            <div class="card-body">
+                {% if state_sequence != 'null' %}
+                <div id="state-timeline" style="width:100%; height:200px;"></div>
+                {% endif %}
+                {% if dynamic_features %}
+                <div id="occupancy-chart" style="width:100%; height:230px;"></div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Feature Tables -->
+<div class="row">
+    {% if static_features %}
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-project-diagram"></i> Static Global Metrics</h5>
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-striped mb-0">
+                    <thead><tr><th>Metric</th><th>Value</th></tr></thead>
+                    <tbody>
+                    {% for f in static_features %}
+                    <tr>
+                        <td>{{ f.name }}</td>
+                        <td><code>{{ "%.6f"|format(f.value) }}</code></td>
+                    </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if dynamic_features %}
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-exchange-alt"></i> Dynamic Metrics</h5>
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-striped mb-0">
+                    <thead><tr><th>Metric</th><th>Value</th></tr></thead>
+                    <tbody>
+                    {% for f in dynamic_features %}
+                    <tr>
+                        <td>{{ f.name }}</td>
+                        <td><code>{{ "%.6f"|format(f.value) }}</code></td>
+                    </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+{% if static_node_features %}
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="fas fa-circle-nodes"></i> Node-level Metrics</h5>
+        <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#node-metrics">
+            Show/Hide ({{ static_node_features|length }} entries)
+        </button>
+    </div>
+    <div class="collapse" id="node-metrics">
+        <div class="card-body p-0">
+            <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                <table class="table table-sm table-striped mb-0">
+                    <thead><tr><th>ROI / Metric</th><th>Value</th></tr></thead>
+                    <tbody>
+                    {% for f in static_node_features %}
+                    <tr>
+                        <td>{{ f.name }}</td>
+                        <td><code>{{ "%.6f"|format(f.value) }}</code></td>
+                    </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% if not static_features and not dynamic_features and not errors %}
+<div class="text-center py-5">
+    <i class="fas fa-hourglass-half fa-3x text-muted mb-3"></i>
+    <p class="text-muted">No features computed yet. Analysis may still be running.</p>
+    <button class="btn btn-outline-primary" onclick="location.reload()">
+        <i class="fas fa-sync"></i> Refresh
+    </button>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+<script>
+$(function() {
+    var connMatrix = {{ conn_matrix }};
+    var connLabels = {{ conn_labels }};
+    var stateSeq = {{ state_sequence }};
+
+    // Connectivity heatmap
+    if (connMatrix) {
+        var heatData = [{
+            z: connMatrix,
+            x: connLabels,
+            y: connLabels,
+            type: 'heatmap',
+            colorscale: 'RdBu',
+            zmid: 0,
+            colorbar: {title: 'Correlation'}
+        }];
+        Plotly.newPlot('conn-heatmap', heatData, {
+            title: 'Functional Connectivity',
+            margin: {l: 80, r: 30, t: 40, b: 80},
+            xaxis: {tickangle: -45, tickfont: {size: 8}},
+            yaxis: {tickfont: {size: 8}}
+        }, {responsive: true});
+    }
+
+    // State timeline
+    if (stateSeq && document.getElementById('state-timeline')) {
+        var timeData = [{
+            y: stateSeq,
+            mode: 'lines+markers',
+            type: 'scatter',
+            marker: {size: 3},
+            line: {width: 1}
+        }];
+        Plotly.newPlot('state-timeline', timeData, {
+            title: 'State Sequence',
+            xaxis: {title: 'Window'},
+            yaxis: {title: 'State', dtick: 1},
+            margin: {l: 50, r: 20, t: 40, b: 40}
+        }, {responsive: true});
+    }
+
+    // Occupancy bar chart
+    var occFeatures = [];
+    {% for f in dynamic_features %}
+    {% if 'occupancy' in f.name %}
+    occFeatures.push({name: '{{ f.name }}', value: {{ f.value }}});
+    {% endif %}
+    {% endfor %}
+
+    if (occFeatures.length > 0 && document.getElementById('occupancy-chart')) {
+        var barData = [{
+            x: occFeatures.map(function(f) { return f.name.replace('_occupancy', '').replace('state_', 'State '); }),
+            y: occFeatures.map(function(f) { return f.value; }),
+            type: 'bar',
+            marker: {color: ['#4e79a7', '#f28e2b', '#e15759', '#76b7b2', '#59a14f', '#edc948']}
+        }];
+        Plotly.newPlot('occupancy-chart', barData, {
+            title: 'State Occupancy',
+            xaxis: {title: ''},
+            yaxis: {title: 'Fraction', range: [0, 1]},
+            margin: {l: 50, r: 20, t: 40, b: 40}
+        }, {responsive: true});
+    }
+});
+</script>
+{% endblock %}

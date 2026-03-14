@@ -21,14 +21,24 @@ import sqlite3
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 
-from preprocessing_full import PreprocessPipeline, PreprocessPipelineConfig
-from dynamic import DynamicAnalyzer, DynamicConfig
-from static_analysis import StaticAnalyzer
-
-from visualization import ReportConfig, ReportGenerator
-
 from data_management import DatasetManager
 import openneuro_client
+
+# Heavy scientific dependencies are imported lazily inside functions
+# so that the web app can start even when numpy/scipy/nibabel are missing.
+# This allows browsing datasets and managing patients without the full stack.
+_ANALYSIS_DEPS_ERROR = None
+try:
+    from preprocessing_full import PreprocessPipeline, PreprocessPipelineConfig, RoiExtractionConfig
+    from dynamic import DynamicAnalyzer, DynamicConfig
+    from static_analysis import StaticAnalyzer
+    from visualization import ReportConfig, ReportGenerator
+except ImportError as _exc:
+    _ANALYSIS_DEPS_ERROR = str(_exc)
+    PreprocessPipeline = PreprocessPipelineConfig = RoiExtractionConfig = None
+    DynamicAnalyzer = DynamicConfig = None
+    StaticAnalyzer = None
+    ReportConfig = ReportGenerator = None
 
 
 # Initialize Flask app
@@ -149,6 +159,15 @@ def init_db():
 init_db()
 
 
+def _check_analysis_deps() -> None:
+    """Raise RuntimeError if analysis dependencies are missing."""
+    if _ANALYSIS_DEPS_ERROR:
+        raise RuntimeError(
+            f"Analysis dependencies are not installed: {_ANALYSIS_DEPS_ERROR}. "
+            "Run: pip install numpy scipy pandas nibabel scikit-learn networkx"
+        )
+
+
 def process_image(image_id: int, filepath: str) -> None:
     """Run preprocessing and analysis pipelines for an uploaded image.
 
@@ -156,7 +175,13 @@ def process_image(image_id: int, filepath: str) -> None:
     caught and logged as an ``error`` feature to aid debugging.
     """
     try:
-        pipeline = PreprocessPipeline(PreprocessPipelineConfig())
+        _check_analysis_deps()
+
+        # Configure preprocessing with ROI extraction enabled
+        config = PreprocessPipelineConfig(
+            roi_extraction=RoiExtractionConfig(enabled=True),
+        )
+        pipeline = PreprocessPipeline(config)
         preproc = pipeline.run(filepath)
         roi_ts = preproc.get('roi_timeseries')
         labels = preproc.get('roi_labels') or []
@@ -164,26 +189,84 @@ def process_image(image_id: int, filepath: str) -> None:
         if roi_ts is None or not len(labels):
             raise ValueError('Preprocessing produced no ROI time series')
 
+        import numpy as np
+
+        # Static analysis
         static_analyzer = StaticAnalyzer()
         conn_matrix = static_analyzer.compute_connectivity(roi_ts, labels)
         graph_metrics = static_analyzer.compute_graph_metrics(conn_matrix)
 
-        dyn_cfg = DynamicConfig(window_length=10, step=5, n_states=2)
+        # Dynamic analysis with adaptive parameters
+        n_timepoints = roi_ts.shape[0]
+        window_length = min(30, max(5, n_timepoints // 5))
+        step = max(1, window_length // 3)
+        n_states = min(4, max(2, n_timepoints // (window_length * 2)))
+
+        dyn_cfg = DynamicConfig(
+            window_length=window_length, step=step, n_states=n_states,
+        )
         dyn_analyzer = DynamicAnalyzer(dyn_cfg)
         dyn_result = dyn_analyzer.analyse(roi_ts)
 
         db = sqlite3.connect('brainnet.db')
         cur = db.cursor()
+
+        # Store static node metrics (per-ROI)
+        for metric_name, values in graph_metrics.node_metrics.items():
+            for i, val in enumerate(values):
+                label = labels[i] if i < len(labels) else str(i)
+                cur.execute(
+                    'INSERT INTO features (image_id, feature_name, feature_value, feature_type) VALUES (?, ?, ?, ?)',
+                    (image_id, f"{metric_name}_{label}", float(val), 'static_node'),
+                )
+
+        # Store static global metrics
         for name, value in graph_metrics.global_metrics.items():
             cur.execute(
                 'INSERT INTO features (image_id, feature_name, feature_value, feature_type) VALUES (?, ?, ?, ?)',
                 (image_id, name, float(value), 'static'),
             )
+
+        # Store dynamic metrics
         for idx, occ in enumerate(dyn_result.metrics.occupancy):
             cur.execute(
                 'INSERT INTO features (image_id, feature_name, feature_value, feature_type) VALUES (?, ?, ?, ?)',
                 (image_id, f"state_{idx}_occupancy", float(occ), 'dynamic'),
             )
+        if hasattr(dyn_result.metrics, 'dwell_time') and dyn_result.metrics.dwell_time is not None:
+            for idx, dt in enumerate(dyn_result.metrics.dwell_time):
+                cur.execute(
+                    'INSERT INTO features (image_id, feature_name, feature_value, feature_type) VALUES (?, ?, ?, ?)',
+                    (image_id, f"state_{idx}_dwell_time", float(dt), 'dynamic'),
+                )
+        if hasattr(dyn_result.metrics, 'transition_probs') and dyn_result.metrics.transition_probs is not None:
+            tp = dyn_result.metrics.transition_probs
+            for i in range(tp.shape[0]):
+                for j in range(tp.shape[1]):
+                    cur.execute(
+                        'INSERT INTO features (image_id, feature_name, feature_value, feature_type) VALUES (?, ?, ?, ?)',
+                        (image_id, f"transition_{i}_to_{j}", float(tp[i, j]), 'dynamic'),
+                    )
+
+        # Store connectivity matrix as JSON blob for visualization
+        conn_json = json.dumps(conn_matrix.matrix.tolist())
+        cur.execute(
+            'INSERT INTO features (image_id, feature_name, feature_value, feature_type) VALUES (?, ?, ?, ?)',
+            (image_id, '_connectivity_matrix', 0.0, conn_json),
+        )
+        labels_json = json.dumps(list(labels))
+        cur.execute(
+            'INSERT INTO features (image_id, feature_name, feature_value, feature_type) VALUES (?, ?, ?, ?)',
+            (image_id, '_connectivity_labels', 0.0, labels_json),
+        )
+
+        # Store state sequence for visualization
+        state_seq_json = json.dumps(dyn_result.state_sequence.tolist())
+        cur.execute(
+            'INSERT INTO features (image_id, feature_name, feature_value, feature_type) VALUES (?, ?, ?, ?)',
+            (image_id, '_state_sequence', 0.0, state_seq_json),
+        )
+
         db.commit()
         db.close()
     except Exception as exc:  # pragma: no cover - best effort logging
@@ -449,16 +532,30 @@ def patient_report(patient_id):
             process_image(img_id, path)
     db.close()
 
+    _check_analysis_deps()
+
+    import numpy as np
+
     # Re-run analysis for the first image to obtain objects for report
     first_id, first_path = images[0]
-    pipeline = PreprocessPipeline(PreprocessPipelineConfig())
+    config = PreprocessPipelineConfig(
+        roi_extraction=RoiExtractionConfig(enabled=True),
+    )
+    pipeline = PreprocessPipeline(config)
     preproc = pipeline.run(first_path)
     roi_ts = preproc.get('roi_timeseries')
     labels = preproc.get('roi_labels') or []
+
     static_analyzer = StaticAnalyzer()
     conn_matrix = static_analyzer.compute_connectivity(roi_ts, labels)
     graph_metrics = static_analyzer.compute_graph_metrics(conn_matrix)
-    dyn_cfg = DynamicConfig(window_length=10, step=5, n_states=2)
+
+    n_timepoints = roi_ts.shape[0]
+    window_length = min(30, max(5, n_timepoints // 5))
+    step = max(1, window_length // 3)
+    n_states = min(4, max(2, n_timepoints // (window_length * 2)))
+
+    dyn_cfg = DynamicConfig(window_length=window_length, step=step, n_states=n_states)
     dyn_analyzer = DynamicAnalyzer(dyn_cfg)
     dyn_model = dyn_analyzer.analyse(roi_ts)
 
@@ -653,34 +750,145 @@ def delete_image(image_id):
 
 @app.route('/features/<int:image_id>')
 def view_features(image_id):
-    """View features for a specific image."""
+    """View features for a specific image with visualizations."""
     conn = sqlite3.connect('brainnet.db')
     cursor = conn.cursor()
-    
-    # Get image info
+
     cursor.execute('''
-        SELECT mri_images.image_path, patients.name 
-        FROM mri_images 
+        SELECT mri_images.id, mri_images.image_path, mri_images.image_type,
+               mri_images.description, patients.name, patients.id
+        FROM mri_images
         JOIN patients ON mri_images.patient_id = patients.id
         WHERE mri_images.id = ?
     ''', (image_id,))
     image_info = cursor.fetchone()
-    
-    # Get features
+
     cursor.execute('''
-        SELECT feature_name, feature_value, feature_type, calculated_at 
-        FROM features 
-        WHERE image_id = ? 
-        ORDER BY calculated_at DESC
+        SELECT id, feature_name, feature_value, feature_type, calculated_at
+        FROM features
+        WHERE image_id = ?
+        ORDER BY feature_type, feature_name
     ''', (image_id,))
     features = cursor.fetchall()
-    
+
     conn.close()
-    
-    if image_info:
-        return render_template('features.html', image_info=image_info, features=features)
-    else:
+
+    if not image_info:
         return "Image not found", 404
+
+    # Separate features by type and extract visualization data
+    static_features = []
+    static_node_features = []
+    dynamic_features = []
+    errors = []
+    conn_matrix = None
+    conn_labels = None
+    state_sequence = None
+
+    for f in features:
+        fid, fname, fval, ftype, fcalc = f
+        if fname.startswith('_connectivity_matrix'):
+            try:
+                conn_matrix = json.loads(ftype)
+            except (json.JSONDecodeError, TypeError):
+                pass
+        elif fname.startswith('_connectivity_labels'):
+            try:
+                conn_labels = json.loads(ftype)
+            except (json.JSONDecodeError, TypeError):
+                pass
+        elif fname.startswith('_state_sequence'):
+            try:
+                state_sequence = json.loads(ftype)
+            except (json.JSONDecodeError, TypeError):
+                pass
+        elif fname == 'error':
+            errors.append({'message': ftype, 'time': fcalc})
+        elif ftype == 'static':
+            static_features.append({'id': fid, 'name': fname, 'value': fval, 'time': fcalc})
+        elif ftype == 'static_node':
+            static_node_features.append({'id': fid, 'name': fname, 'value': fval, 'time': fcalc})
+        elif ftype == 'dynamic':
+            dynamic_features.append({'id': fid, 'name': fname, 'value': fval, 'time': fcalc})
+
+    return render_template(
+        'features_detail.html',
+        image=image_info,
+        static_features=static_features,
+        static_node_features=static_node_features,
+        dynamic_features=dynamic_features,
+        errors=errors,
+        conn_matrix=json.dumps(conn_matrix) if conn_matrix else 'null',
+        conn_labels=json.dumps(conn_labels) if conn_labels else '[]',
+        state_sequence=json.dumps(state_sequence) if state_sequence else 'null',
+    )
+
+
+@app.route('/features/<int:image_id>/delete', methods=['POST'])
+def delete_features(image_id):
+    """Delete all computed features for an image."""
+    conn = sqlite3.connect('brainnet.db')
+    cur = conn.cursor()
+    cur.execute('SELECT patient_id FROM mri_images WHERE id = ?', (image_id,))
+    row = cur.fetchone()
+    cur.execute('DELETE FROM features WHERE image_id = ?', (image_id,))
+    conn.commit()
+    conn.close()
+    if row:
+        return redirect(url_for('patient_detail', patient_id=row[0]))
+    return redirect(url_for('index'))
+
+
+@app.route('/features/<int:image_id>/recompute', methods=['POST'])
+def recompute_features(image_id):
+    """Delete existing features and re-run analysis."""
+    conn = sqlite3.connect('brainnet.db')
+    cur = conn.cursor()
+    cur.execute('SELECT image_path FROM mri_images WHERE id = ?', (image_id,))
+    row = cur.fetchone()
+    if not row:
+        conn.close()
+        return "Image not found", 404
+    cur.execute('DELETE FROM features WHERE image_id = ?', (image_id,))
+    conn.commit()
+    conn.close()
+    executor.submit(process_image, image_id, row[0])
+    return redirect(url_for('view_features', image_id=image_id))
+
+
+@app.route('/api/features/<int:image_id>/export')
+def export_features(image_id):
+    """Export features as JSON."""
+    conn = sqlite3.connect('brainnet.db')
+    cur = conn.cursor()
+    cur.execute(
+        'SELECT feature_name, feature_value, feature_type FROM features WHERE image_id = ?',
+        (image_id,),
+    )
+    rows = cur.fetchall()
+    conn.close()
+    result = {}
+    for name, value, ftype in rows:
+        if name.startswith('_'):
+            continue
+        if ftype not in result:
+            result[ftype] = {}
+        result[ftype][name] = value
+    return jsonify({'image_id': image_id, 'features': result})
+
+
+@app.route('/system/status')
+def system_status():
+    """Show system dependency status."""
+    deps = {}
+    for pkg in ['numpy', 'scipy', 'pandas', 'nibabel', 'nilearn',
+                 'sklearn', 'networkx', 'plotly', 'hmmlearn']:
+        try:
+            mod = __import__(pkg)
+            deps[pkg] = getattr(mod, '__version__', 'installed')
+        except ImportError:
+            deps[pkg] = None
+    return render_template('system_status.html', deps=deps, analysis_error=_ANALYSIS_DEPS_ERROR)
 
 @app.route('/api/patients')
 def api_patients():

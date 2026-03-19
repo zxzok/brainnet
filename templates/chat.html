@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}BrainNet Chat{% endblock %}
+{% block content %}
+<div class="container mt-4">
+    <h2>BrainNet Chat</h2>
+    {% if api_error %}
+    <div class="alert alert-warning">{{ api_error }}</div>
+    {% endif %}
+    <div id="chat-container">
+        <p>Chat interface placeholder. Full UI coming soon.</p>
+    </div>
+</div>
+{% endblock %}

@@ -2,6 +2,29 @@
 
 BrainNet 是一个面向科研人员的 fMRI 脑网络分析平台，提供从数据获取、预处理、静态/动态功能连接分析到交互式可视化的完整工作流。平台内置深色科学主题 Web 界面，支持被试管理、OpenNeuro 公共数据集下载、自动化分析流水线和 Claude AI 智能对话。
 
+## 系统截图
+
+### 落地页
+![落地页](docs/screenshots/landing.png)
+
+### 控制台
+![控制台](docs/screenshots/console.png)
+
+### 被试管理
+![被试管理](docs/screenshots/patients.png)
+
+### 数据中心
+![数据中心](docs/screenshots/data_hub.png)
+
+### 计算特征
+![计算特征](docs/screenshots/features.png)
+
+### AI 对话
+![AI 对话](docs/screenshots/chat.png)
+
+### 系统设置
+![系统设置](docs/screenshots/settings.png)
+
 ## 功能特性
 
 ### 数据管理

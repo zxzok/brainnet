@@ -37,6 +37,10 @@ llm = [
   "openai>=1.0",
   "anthropic>=0.40",
 ]
+viz = [
+  "matplotlib>=3.8",
+]
+docker = []
 
 [project.scripts]
 brainnet-cli = "brainnet.main:main"

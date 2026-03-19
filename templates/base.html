@@ -734,6 +734,9 @@
             <li><a class="nav-link {% if request.endpoint in ('network_visualization',) %}active{% endif %}" href="{{ url_for('network_visualization') }}">
                 <i class="fas fa-project-diagram"></i> 网络
             </a></li>
+            <li><a class="nav-link {% if request.endpoint in ('brain_view', 'brain_view_index') %}active{% endif %}" href="{{ url_for('brain_view_index') }}">
+                <i class="fas fa-brain"></i> 脑图
+            </a></li>
             <li><a class="nav-link {% if request.endpoint == 'chat_page' %}active{% endif %}" href="/chat">
                 <i class="fas fa-comments"></i> AI 对话
             </a></li>

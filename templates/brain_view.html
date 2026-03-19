@@ -1,0 +1,213 @@
+{% extends "base.html" %}
+{% block title %}脑网络可视化 - BrainNet{% endblock %}
+
+{% block head %}
+<style>
+    .brain-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+    }
+    .brain-card {
+        background: var(--bg-card);
+        border: 1px solid var(--border-default);
+        border-radius: var(--radius-lg);
+        overflow: hidden;
+    }
+    .brain-card-header {
+        padding: 14px 18px;
+        border-bottom: 1px solid var(--border-subtle);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .brain-card-header h5 { margin: 0; }
+    .brain-card-body {
+        padding: 16px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 200px;
+    }
+    .brain-card-body img {
+        max-width: 100%;
+        height: auto;
+        border-radius: var(--radius-sm);
+    }
+    .brain-full {
+        grid-column: 1 / -1;
+    }
+    .empty-viz {
+        text-align: center;
+        color: var(--text-ghost);
+        padding: 40px 20px;
+    }
+    .empty-viz i {
+        font-size: 2.5rem;
+        margin-bottom: 12px;
+        display: block;
+        color: var(--text-ghost);
+    }
+    .tool-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 16px;
+    }
+    .tool-card {
+        background: var(--bg-card);
+        border: 1px solid var(--border-default);
+        border-radius: var(--radius-md);
+        padding: 20px;
+        text-align: center;
+    }
+    .tool-card i {
+        font-size: 2rem;
+        margin-bottom: 10px;
+        display: block;
+    }
+    .tool-card .tool-name { font-weight: 600; margin-bottom: 6px; }
+    .tool-card .tool-desc { font-size: 0.82rem; color: var(--text-tertiary); margin-bottom: 10px; }
+    .tool-status {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 0.78rem;
+        padding: 3px 10px;
+        border-radius: 999px;
+    }
+    .tool-status.available { background: rgba(56, 217, 197, 0.12); color: var(--accent-cyan); }
+    .tool-status.unavailable { background: rgba(245, 166, 35, 0.12); color: var(--accent-amber); }
+
+    @media (max-width: 768px) {
+        .brain-grid { grid-template-columns: 1fr; }
+        .tool-grid { grid-template-columns: 1fr; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <div class="page-header">
+        <div>
+            <h1><i class="fas fa-brain"></i>脑网络可视化</h1>
+            <p class="page-subtitle">
+                {% if patient_name %}
+                <a href="{{ url_for('patient_detail', patient_id=patient_id) }}" style="color: var(--text-tertiary);">{{ patient_name }}</a>
+                <span style="color: var(--text-ghost); margin: 0 6px;">/</span>
+                {% endif %}
+                基于 nilearn 的大脑网络渲染
+            </p>
+        </div>
+        {% if image_id %}
+        <div style="display: flex; gap: 8px;">
+            <a href="{{ url_for('view_features', image_id=image_id) }}" class="btn btn-ghost"><i class="fas fa-chart-bar"></i> 分析指标</a>
+        </div>
+        {% endif %}
+    </div>
+
+    {% if glass_brain %}
+    <!-- Glass Brain Connectome -->
+    <div class="brain-grid mb-lg">
+        <div class="brain-card brain-full">
+            <div class="brain-card-header">
+                <h5><i class="fas fa-brain" style="color: var(--accent-cyan);"></i> 玻璃脑连接图</h5>
+                <span class="badge badge-blue">三视图</span>
+            </div>
+            <div class="brain-card-body" style="background: #0e1019;">
+                <img src="{{ glass_brain }}" alt="Glass brain connectome">
+            </div>
+        </div>
+
+        <!-- Connectivity Matrix -->
+        {% if conn_matrix_img %}
+        <div class="brain-card">
+            <div class="brain-card-header">
+                <h5><i class="fas fa-th" style="color: var(--accent-violet);"></i> 连接矩阵</h5>
+            </div>
+            <div class="brain-card-body" style="background: #0e1019;">
+                <img src="{{ conn_matrix_img }}" alt="Connectivity matrix">
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Connectivity Circle -->
+        {% if chord_diagram %}
+        <div class="brain-card">
+            <div class="brain-card-header">
+                <h5><i class="fas fa-circle-notch" style="color: var(--accent-amber);"></i> 连接弦图</h5>
+            </div>
+            <div class="brain-card-body" style="background: #0e1019;">
+                <img src="{{ chord_diagram }}" alt="Connectivity circle">
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Node Strength Map -->
+        {% if node_strength %}
+        <div class="brain-card brain-full">
+            <div class="brain-card-header">
+                <h5><i class="fas fa-map-marked-alt" style="color: var(--accent-emerald);"></i> 节点强度分布</h5>
+                <span class="badge badge-emerald">轴位切面</span>
+            </div>
+            <div class="brain-card-body" style="background: #0e1019;">
+                <img src="{{ node_strength }}" alt="Node strength">
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Brain Region Atlas -->
+        {% if atlas_overlay %}
+        <div class="brain-card brain-full">
+            <div class="brain-card-header">
+                <h5><i class="fas fa-puzzle-piece" style="color: var(--accent-rose);"></i> 脑区分区图</h5>
+                <span class="badge">{{ atlas_name or 'AAL' }}</span>
+            </div>
+            <div class="brain-card-body" style="background: #0e1019;">
+                <img src="{{ atlas_overlay }}" alt="Brain regions">
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    {% else %}
+    <div class="card mb-lg">
+        <div class="empty-viz">
+            <i class="fas fa-brain"></i>
+            <p>暂无可视化数据。上传 MRI 影像并运行分析后，将在此显示脑网络图。</p>
+            <a href="{{ url_for('patients') }}" class="btn btn-primary" style="margin-top: 12px;">
+                <i class="fas fa-user-plus"></i> 管理被试
+            </a>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Docker Tools Status -->
+    <div class="card">
+        <div class="card-header">
+            <h5><i class="fab fa-docker"></i> 外部工具集成</h5>
+        </div>
+        <div class="card-body">
+            <div class="tool-grid">
+                {% for tool in docker_tools %}
+                <div class="tool-card">
+                    <i class="fas fa-{% if tool.name == 'fmriprep' %}magic{% elif tool.name == 'fsl' %}cube{% else %}flask{% endif %}"
+                       style="color: {% if tool.docker_available %}var(--accent-cyan){% else %}var(--accent-amber){% endif %};"></i>
+                    <div class="tool-name">{{ tool.name | upper }}</div>
+                    <div class="tool-desc">{{ tool.description }}</div>
+                    <span class="tool-status {{ 'available' if tool.docker_available else 'unavailable' }}">
+                        <i class="fas fa-{{ 'check-circle' if tool.docker_available else 'exclamation-circle' }}"></i>
+                        {{ 'Docker 就绪' if tool.docker_available else 'Docker 未就绪' }}
+                    </span>
+                </div>
+                {% endfor %}
+            </div>
+            {% if not any_docker %}
+            <p style="color: var(--text-tertiary); font-size: 0.85rem; margin-top: 14px; text-align: center;">
+                <i class="fas fa-info-circle"></i>
+                安装 <a href="https://docs.docker.com/get-docker/" target="_blank" style="color: var(--accent-cyan);">Docker Desktop</a>
+                后即可使用 fmriprep、FSL、SPM 等外部工具进行高级预处理。
+            </p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

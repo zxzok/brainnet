@@ -111,6 +111,16 @@ try:  # pragma: no cover
 except Exception:  # pragma: no cover
     ReportConfig = ReportGenerator = None
 
+try:  # pragma: no cover
+    from . import brain_visualization
+except Exception:  # pragma: no cover
+    brain_visualization = None
+
+try:  # pragma: no cover
+    from . import docker_tools
+except Exception:  # pragma: no cover
+    docker_tools = None
+
 
 __all__ = [
     'BIDSFile',

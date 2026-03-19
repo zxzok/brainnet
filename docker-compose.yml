@@ -1,0 +1,50 @@
+# BrainNet Docker Compose 配置
+# 包含主应用 + 可选的神经影像处理工具
+version: "3.9"
+
+services:
+  # ── 主应用 ──────────────────────────────────
+  brainnet:
+    build: .
+    ports:
+      - "6525:6525"
+    volumes:
+      - ./instance:/app/instance        # 数据库和缓存
+      - brainnet-data:/data             # 数据集存储
+    environment:
+      - PYTHONUNBUFFERED=1
+      - MPLBACKEND=Agg
+    restart: unless-stopped
+
+  # ── fmriprep (按需启动) ────────────────────
+  # 使用: docker compose run --rm fmriprep /data /out participant --participant-label 01
+  fmriprep:
+    image: nipreps/fmriprep:latest
+    profiles: ["tools"]
+    volumes:
+      - brainnet-data:/data:ro
+      - brainnet-output:/out
+      - ./license.txt:/opt/freesurfer/license.txt:ro
+    entrypoint: ["fmriprep"]
+
+  # ── FSL (按需启动) ────────────────────────
+  # 使用: docker compose run --rm fsl bet /work/input.nii.gz /work/output -f 0.5 -R
+  fsl:
+    image: brainlife/fsl:6.0.7
+    profiles: ["tools"]
+    volumes:
+      - brainnet-data:/work
+    working_dir: /work
+
+  # ── SPM (按需启动) ────────────────────────
+  # 使用: docker compose run --rm spm script /work/batch.m
+  spm:
+    image: spmcentral/spm:standalone-latest
+    profiles: ["tools"]
+    volumes:
+      - brainnet-data:/work
+    working_dir: /work
+
+volumes:
+  brainnet-data:
+  brainnet-output:

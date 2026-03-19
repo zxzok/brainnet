@@ -30,6 +30,8 @@ try:
     from brainnet.data_management import DatasetManager
     from brainnet import openneuro_client
     from brainnet.runtime import connect_db, get_database_path, get_reports_dir, get_upload_dir
+    from brainnet import brain_visualization as brain_viz
+    from brainnet import docker_tools
 except ImportError:
     from analysis_service import (
         analyze_and_store_image,
@@ -39,6 +41,8 @@ except ImportError:
     from data_management import DatasetManager
     import openneuro_client
     from runtime import connect_db, get_database_path, get_reports_dir, get_upload_dir
+    import brain_visualization as brain_viz
+    import docker_tools
 
 
 # Initialize Flask app
@@ -1197,6 +1201,109 @@ def gallery():
     images = cursor.fetchall()
     conn.close()
     return render_template('gallery.html', images=images)
+
+# ── Brain network visualization routes ──────────────────────────────
+
+@app.route('/brain_view')
+def brain_view_index():
+    """Brain visualisation landing page without a specific image."""
+    tools = docker_tools.list_available_tools()
+    return render_template(
+        'brain_view.html',
+        glass_brain=None,
+        docker_tools=tools,
+        any_docker=any(t['docker_available'] for t in tools),
+        patient_name=None,
+        patient_id=None,
+        image_id=None,
+    )
+
+
+@app.route('/brain_view/<int:image_id>')
+def brain_view(image_id):
+    """Generate brain network visualisations for a specific MRI image."""
+    import numpy as np
+
+    conn = connect_db()
+    cursor = conn.cursor()
+
+    # Get image and patient info
+    cursor.execute('''
+        SELECT mri_images.id, mri_images.image_path, mri_images.image_type,
+               mri_images.description, patients.name, patients.id
+        FROM mri_images
+        JOIN patients ON mri_images.patient_id = patients.id
+        WHERE mri_images.id = ?
+    ''', (image_id,))
+    image_info = cursor.fetchone()
+
+    # Retrieve connectivity matrix from features
+    cursor.execute('''
+        SELECT feature_name, feature_type
+        FROM features WHERE image_id = ?
+    ''', (image_id,))
+    features = cursor.fetchall()
+    conn.close()
+
+    if not image_info:
+        return "影像不存在", 404
+
+    conn_matrix = None
+    conn_labels = None
+    for fname, ftype in features:
+        if fname.startswith('_connectivity_matrix'):
+            try:
+                conn_matrix = np.array(json.loads(ftype))
+            except (json.JSONDecodeError, TypeError):
+                pass
+        elif fname.startswith('_connectivity_labels'):
+            try:
+                conn_labels = json.loads(ftype)
+            except (json.JSONDecodeError, TypeError):
+                pass
+
+    glass_brain = ""
+    conn_matrix_img = ""
+    chord_diagram = ""
+    node_strength = ""
+    atlas_overlay = ""
+
+    if conn_matrix is not None and len(conn_matrix) > 0:
+        glass_brain = brain_viz.plot_glass_brain_connectome(
+            conn_matrix, labels=conn_labels,
+            title=f"{image_info[4]} — 脑网络连接",
+        )
+        conn_matrix_img = brain_viz.plot_connectivity_matrix_brain(
+            conn_matrix, labels=conn_labels,
+        )
+        chord_diagram = brain_viz.plot_connectome_circle(
+            conn_matrix, labels=conn_labels,
+        )
+        node_strength = brain_viz.plot_node_strength_brain(conn_matrix)
+        atlas_overlay = brain_viz.plot_brain_regions()
+
+    tools = docker_tools.list_available_tools()
+    return render_template(
+        'brain_view.html',
+        glass_brain=glass_brain,
+        conn_matrix_img=conn_matrix_img,
+        chord_diagram=chord_diagram,
+        node_strength=node_strength,
+        atlas_overlay=atlas_overlay,
+        atlas_name="AAL",
+        docker_tools=tools,
+        any_docker=any(t['docker_available'] for t in tools),
+        patient_name=image_info[4],
+        patient_id=image_info[5],
+        image_id=image_id,
+    )
+
+
+@app.route('/api/docker_tools')
+def api_docker_tools():
+    """Return Docker tool availability as JSON."""
+    return jsonify(docker_tools.list_available_tools())
+
 
 # Register chat blueprint
 try:

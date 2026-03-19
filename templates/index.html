@@ -58,8 +58,8 @@
                     <a href="{{ url_for('data_hub') }}" class="btn btn-ghost" style="justify-content: center;">
                         <i class="fas fa-database"></i> 数据中心
                     </a>
-                    <a href="{{ url_for('analysis') }}" class="btn btn-ghost" style="justify-content: center;">
-                        <i class="fas fa-chart-line"></i> 分析结果
+                    <a href="{{ url_for('brain_view_index') }}" class="btn btn-ghost" style="justify-content: center;">
+                        <i class="fas fa-brain"></i> 脑网络图
                     </a>
                 </div>
             </div>
@@ -108,7 +108,7 @@
     <!-- 功能模块 -->
     <div class="mt-lg">
         <h3 style="font-size: 0.78rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-tertiary); margin-bottom: 14px;">分析能力</h3>
-        <div class="grid grid-3">
+        <div class="grid" style="grid-template-columns: repeat(3, 1fr); gap: 16px;">
             <div class="card" style="border-color: rgba(56, 217, 197, 0.08);">
                 <div class="card-body">
                     <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
@@ -134,6 +134,33 @@
                         <span style="font-weight: 600; font-size: 0.9rem;">AI 编排器</span>
                     </div>
                     <p class="card-text" style="font-size: 0.82rem; line-height: 1.5;">Claude 驱动的多策略比较。描述目标，获取自动流水线设计和策略排名。</p>
+                </div>
+            </div>
+            <div class="card" style="border-color: rgba(71, 217, 138, 0.08);">
+                <div class="card-body">
+                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                        <i class="fas fa-brain" style="color: var(--accent-emerald); font-size: 0.9rem;"></i>
+                        <span style="font-weight: 600; font-size: 0.9rem;">脑网络可视化</span>
+                    </div>
+                    <p class="card-text" style="font-size: 0.82rem; line-height: 1.5;">基于 nilearn 的玻璃脑、连接矩阵、弦图和节点强度图。</p>
+                </div>
+            </div>
+            <div class="card" style="border-color: rgba(255, 179, 71, 0.08);">
+                <div class="card-body">
+                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                        <i class="fab fa-docker" style="color: var(--accent-amber); font-size: 0.9rem;"></i>
+                        <span style="font-weight: 600; font-size: 0.9rem;">Docker 工具集成</span>
+                    </div>
+                    <p class="card-text" style="font-size: 0.82rem; line-height: 1.5;">通过 Docker 调用 fmriprep、FSL、SPM 等外部预处理工具。</p>
+                </div>
+            </div>
+            <div class="card" style="border-color: rgba(255, 107, 138, 0.08);">
+                <div class="card-body">
+                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                        <i class="fas fa-microscope" style="color: var(--accent-rose); font-size: 0.9rem;"></i>
+                        <span style="font-weight: 600; font-size: 0.9rem;">nilearn 集成</span>
+                    </div>
+                    <p class="card-text" style="font-size: 0.82rem; line-height: 1.5;">AAL、Harvard-Oxford、Schaefer 脑图谱，ROI 提取与统计分析。</p>
                 </div>
             </div>
         </div>

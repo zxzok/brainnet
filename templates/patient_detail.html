@@ -93,6 +93,9 @@
                             <td class="mono" style="font-size: 0.78rem; color: var(--text-tertiary);">{{ image[6] }}</td>
                             <td style="text-align: right;">
                                 <div style="display: flex; gap: 6px; justify-content: flex-end;">
+                                    <a href="{{ url_for('brain_view', image_id=image[0]) }}" class="btn btn-ghost" style="padding: 4px 10px; font-size: 0.78rem;">
+                                        <i class="fas fa-brain"></i> 脑图
+                                    </a>
                                     <a href="{{ url_for('view_features', image_id=image[0]) }}" class="btn btn-ghost" style="padding: 4px 10px; font-size: 0.78rem;">
                                         <i class="fas fa-chart-bar"></i> 特征
                                     </a>

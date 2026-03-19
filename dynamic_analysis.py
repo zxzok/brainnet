@@ -139,6 +139,7 @@ class DynamicStateModel:
     state_sequence: np.ndarray
     metrics: DynamicMetrics
     extra: Dict = field(default_factory=dict)
+    template: Optional[str] = None
 
 
 class DynamicAnalyzer:

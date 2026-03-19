@@ -4,9 +4,45 @@ from __future__ import annotations
 
 from typing import Any
 
+import os
+
 import numpy as np
 
 from brainnet.session_store import SessionStore, RoiData, StrategyResult
+
+# Allowed base directories for dataset paths (configurable via env var)
+_ALLOWED_DATA_DIRS: list[str] = []
+
+
+def _get_allowed_data_dirs() -> list[str]:
+    """Return allowed base directories for dataset path validation."""
+    if not _ALLOWED_DATA_DIRS:
+        env_dirs = os.environ.get("BRAINNET_DATA_DIRS", "")
+        if env_dirs:
+            _ALLOWED_DATA_DIRS.extend(env_dirs.split(os.pathsep))
+        # Always allow instance/ and openneuro_datasets/ relative to cwd
+        for default in ("instance", "openneuro_datasets"):
+            _ALLOWED_DATA_DIRS.append(os.path.abspath(default))
+    return _ALLOWED_DATA_DIRS
+
+
+def _validate_path(path: str) -> str | None:
+    """Validate a path is under an allowed data directory.
+
+    Returns an error message if invalid, None if OK.
+    """
+    resolved = os.path.realpath(path)
+    # Reject path traversal attempts
+    if ".." in os.path.normpath(path):
+        return "Path traversal ('..') is not allowed."
+    allowed = _get_allowed_data_dirs()
+    if not allowed:
+        # No restrictions configured — allow (dev mode)
+        return None
+    for base in allowed:
+        if resolved.startswith(os.path.realpath(base) + os.sep) or resolved == os.path.realpath(base):
+            return None
+    return f"Path is outside allowed data directories. Allowed: {allowed}"
 
 
 # ---------------------------------------------------------------------------
@@ -331,6 +367,9 @@ def _tool_load_dataset(session: SessionStore, params: dict) -> dict:
 
     try:
         if local_path:
+            path_err = _validate_path(local_path)
+            if path_err:
+                return {"error": path_err}
             idx = DatasetIndex(local_path)
             return {"dataset_path": local_path, "n_subjects": len(idx.list_subjects()), "status": "loaded"}
         elif openneuro_id:
@@ -349,6 +388,9 @@ def _tool_list_subjects(session: SessionStore, params: dict) -> dict:
         return {"error": "Data management dependencies not installed."}
 
     try:
+        path_err = _validate_path(params["dataset_path"])
+        if path_err:
+            return {"error": path_err}
         idx = DatasetIndex(params["dataset_path"])
         subjects = idx.list_subjects()
         return {"subjects": subjects, "count": len(subjects)}
@@ -383,6 +425,10 @@ def _tool_preprocess(session: SessionStore, params: dict) -> dict:
             atlas_path=params.get("atlas", "default"),
         ),
     )
+
+    path_err = _validate_path(params["input_path"])
+    if path_err:
+        return {"error": path_err}
 
     try:
         pipeline = PreprocessPipeline(config)

@@ -1111,8 +1111,8 @@ try:
     except ImportError:
         from web_chat import chat_bp
     app.register_blueprint(chat_bp)
-except Exception:
-    pass  # Chat feature unavailable — web app still works
+except ImportError:
+    pass  # Chat feature unavailable — anthropic or dependencies not installed
 
 # Error handlers
 @app.errorhandler(404)

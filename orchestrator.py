@@ -30,6 +30,7 @@ Rules:
 
 TOKEN_BUDGET = 50_000
 TOKEN_WARNING_THRESHOLD = 0.8
+MAX_TOOL_ROUNDS = 20
 
 
 def sse_format(event: str, data: dict[str, Any]) -> str:
@@ -94,7 +95,7 @@ def run_orchestrator(
 
     client = _get_client()
 
-    while True:
+    for _round in range(MAX_TOOL_ROUNDS):
         with _create_stream(
             client, session.messages, SYSTEM_PROMPT, TOOL_DEFINITIONS, 4096
         ) as stream:
@@ -105,10 +106,24 @@ def run_orchestrator(
 
             final = stream.get_final_message()
 
-        # Record assistant message
+        # Serialize assistant content for JSON-safe storage
+        serialized_content = []
+        for block in final.content:
+            if getattr(block, "type", None) == "text":
+                serialized_content.append({"type": "text", "text": block.text})
+            elif getattr(block, "type", None) == "tool_use":
+                serialized_content.append({
+                    "type": "tool_use",
+                    "id": block.id,
+                    "name": block.name,
+                    "input": block.input,
+                })
+            else:
+                serialized_content.append({"type": "text", "text": str(block)})
+
         session.messages.append({
             "role": "assistant",
-            "content": final.content,
+            "content": serialized_content,
         })
 
         # Process any tool calls
@@ -124,18 +139,18 @@ def run_orchestrator(
                 "params": tool_block.input,
             })
             result = execute_tool(session, tool_block.name, tool_block.input)
+            summary_str = json.dumps(result, ensure_ascii=False, default=str)
             yield sse_format("tool_result", {
                 "tool": tool_block.name,
-                "summary": result,
+                "summary": summary_str[:500] if len(summary_str) > 500 else summary_str,
             })
             tool_results.append({
                 "type": "tool_result",
                 "tool_use_id": tool_block.id,
-                "content": json.dumps(result, ensure_ascii=False, default=str),
+                "content": summary_str,
             })
 
         session.messages.append({"role": "user", "content": tool_results})
-
-        if final.stop_reason == "end_turn":
-            yield sse_format("done", {})
-            break
+    else:
+        yield sse_format("error", {"message": "Maximum tool rounds reached. Please start a new session."})
+        yield sse_format("done", {})

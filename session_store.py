@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import threading
 import time
 import uuid
 from dataclasses import dataclass, field
@@ -72,24 +73,27 @@ class SessionManager:
         self._sessions: dict[str, SessionStore] = {}
         self._max_sessions = max_sessions
         self._timeout_seconds = timeout_seconds
+        self._lock = threading.Lock()
 
     def create_session(self) -> SessionStore:
-        self.evict_expired()
-        if len(self._sessions) >= self._max_sessions:
-            raise RuntimeError(
-                f"Maximum {self._max_sessions} sessions reached. "
-                "Please wait for an existing session to expire."
-            )
-        sid = uuid.uuid4().hex
-        session = SessionStore(session_id=sid)
-        self._sessions[sid] = session
-        return session
+        with self._lock:
+            self.evict_expired()
+            if len(self._sessions) >= self._max_sessions:
+                raise RuntimeError(
+                    f"Maximum {self._max_sessions} sessions reached. "
+                    "Please wait for an existing session to expire."
+                )
+            sid = uuid.uuid4().hex
+            session = SessionStore(session_id=sid)
+            self._sessions[sid] = session
+            return session
 
     def get_session(self, session_id: str) -> SessionStore | None:
-        session = self._sessions.get(session_id)
-        if session is not None:
-            session.touch()
-        return session
+        with self._lock:
+            session = self._sessions.get(session_id)
+            if session is not None:
+                session.touch()
+            return session
 
     def evict_expired(self) -> None:
         now = time.time()

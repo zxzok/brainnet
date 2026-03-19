@@ -295,12 +295,6 @@
         }
     }
 
-    function escapeHtml(text) {
-        const el = document.createElement('span');
-        el.textContent = text;
-        return el.textContent;
-    }
-
     function addUserMessage(text) {
         hideEmptyState();
         const div = document.createElement('div');
@@ -565,7 +559,9 @@
                 showToolStart(data.name || data.tool || 'tool', data.params || data.input || {});
                 break;
             case 'tool_result':
-                showToolResult(data.name || data.tool || 'tool', data.summary || data.result || '');
+                var rawSummary = data.summary || data.result || '';
+                var summaryText = typeof rawSummary === 'object' ? JSON.stringify(rawSummary) : String(rawSummary);
+                showToolResult(data.name || data.tool || 'tool', summaryText);
                 break;
             case 'error':
                 appendText('\n[Error: ' + (data.message || data.error || 'Unknown error') + ']');

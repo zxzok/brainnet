@@ -1,11 +1,16 @@
 {% extends "base.html" %}
-
-{% block title %}500 Internal Server Error - BrainNet MRI Data Management{% endblock %}
+{% block title %}Server Error - BrainNet{% endblock %}
 
 {% block content %}
-<div class="text-center mt-5">
-    <h1 class="display-1">500</h1>
-    <p class="lead">Oops! Something went wrong on the server.</p>
-    <a href="{{ url_for('index') }}" class="btn btn-primary mt-3">Back to Home</a>
+<div class="page-container">
+    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 60vh; text-align: center;">
+        <div style="font-family: var(--mono); font-size: 5rem; font-weight: 700; color: var(--accent-rose); line-height: 1; margin-bottom: 16px; opacity: 0.4;">500</div>
+        <h2 style="font-size: 1.2rem; font-weight: 600; color: var(--text-primary); margin-bottom: 8px;">Something Went Wrong</h2>
+        <p style="color: var(--text-tertiary); font-size: 0.9rem; margin-bottom: 24px;">An internal error occurred. Please try again or check the system status.</p>
+        <div style="display: flex; gap: 10px;">
+            <a href="{{ url_for('index') }}" class="btn btn-primary"><i class="fas fa-arrow-left"></i> Dashboard</a>
+            <a href="{{ url_for('system_status') }}" class="btn btn-ghost"><i class="fas fa-cog"></i> System Status</a>
+        </div>
+    </div>
 </div>
 {% endblock %}

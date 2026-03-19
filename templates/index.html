@@ -1,67 +1,135 @@
 {% extends "base.html" %}
-
-{% block title %}Home - BrainNet MRI Data Management{% endblock %}
+{% block title %}Dashboard - BrainNet{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-    <h1 class="h2">Dashboard</h1>
-</div>
+<div class="page-container">
+    <!-- Hero Stats Row -->
+    <div class="grid grid-4 mb-lg">
+        <div class="stat-card">
+            <div class="stat-label">Subjects</div>
+            <div class="stat-value cyan">{{ patients|length }}</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Datasets</div>
+            <div class="stat-value blue">--</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Analyses Run</div>
+            <div class="stat-value violet">--</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">System</div>
+            <div class="stat-value emerald" style="color: var(--accent-emerald); font-size: 1.1rem; margin-top: 8px;">
+                <i class="fas fa-circle" style="font-size: 8px; vertical-align: middle; margin-right: 6px;"></i>Ready
+            </div>
+        </div>
+    </div>
 
-<div class="row">
-    <div class="col-md-12">
+    <div class="grid" style="grid-template-columns: 1fr 1fr; gap: 20px;">
+        <!-- Welcome / Quick Actions -->
         <div class="card">
-            <div class="card-body">
-                <h5 class="card-title">Welcome to BrainNet MRI Data Management System</h5>
-                <p class="card-text">
-                    This system allows you to manage MRI brain images, patient data, and computed features.
-                    You can browse patients, upload new images, and view computed features for each image.
-                </p>
-                <a href="{{ url_for('patients') }}" class="btn btn-primary">View Patients</a>
+            <div class="card-body" style="padding: 28px;">
+                <div style="display: flex; align-items: flex-start; gap: 16px; margin-bottom: 20px;">
+                    <div style="width: 44px; height: 44px; border-radius: 12px; background: linear-gradient(135deg, rgba(56, 217, 197, 0.15), rgba(74, 142, 255, 0.15)); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                        <i class="fas fa-brain" style="color: var(--accent-cyan); font-size: 1.1rem;"></i>
+                    </div>
+                    <div>
+                        <h3 style="font-size: 1.1rem; font-weight: 600; letter-spacing: -0.02em; margin-bottom: 6px;">fMRI Brain Network Analysis</h3>
+                        <p style="font-size: 0.85rem; color: var(--text-tertiary); line-height: 1.5;">
+                            Multi-strategy connectivity analysis with automated comparison. Load data, run static and dynamic pipelines, and let the AI orchestrator compare approaches.
+                        </p>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <a href="/chat" class="btn btn-primary" style="justify-content: center;">
+                        <i class="fas fa-comments"></i> Analysis Chat
+                    </a>
+                    <a href="{{ url_for('patients') }}" class="btn btn-ghost" style="justify-content: center;">
+                        <i class="fas fa-users"></i> View Subjects
+                    </a>
+                    <a href="{{ url_for('data_hub') }}" class="btn btn-ghost" style="justify-content: center;">
+                        <i class="fas fa-database"></i> Data Hub
+                    </a>
+                    <a href="{{ url_for('analysis') }}" class="btn btn-ghost" style="justify-content: center;">
+                        <i class="fas fa-chart-line"></i> Analysis
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Subjects -->
+        <div class="card">
+            <div class="card-header flex items-center justify-between">
+                <h5>Recent Subjects</h5>
+                <a href="{{ url_for('add_patient') }}" class="btn btn-sm btn-ghost">
+                    <i class="fas fa-plus"></i> Add
+                </a>
+            </div>
+            {% if patients %}
+            <div style="padding: 0;">
+                {% for patient in patients[:6] %}
+                <a href="{{ url_for('patient_detail', patient_id=patient[0]) }}" style="display: flex; align-items: center; justify-content: space-between; padding: 10px 20px; border-bottom: 1px solid var(--border-subtle); text-decoration: none; transition: background var(--transition-fast);" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background='transparent'">
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <div style="width: 32px; height: 32px; border-radius: 8px; background: var(--bg-overlay); display: flex; align-items: center; justify-content: center; font-family: var(--mono); font-size: 0.75rem; color: var(--accent-cyan); border: 1px solid var(--border-subtle);">
+                            {{ patient[1][:2] }}
+                        </div>
+                        <div>
+                            <div style="font-size: 0.87rem; color: var(--text-primary); font-weight: 500;">{{ patient[2] }}</div>
+                            <div style="font-size: 0.75rem; color: var(--text-tertiary); font-family: var(--mono);">{{ patient[1] }}</div>
+                        </div>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        {% if patient[5] %}
+                        <span class="badge badge-violet">{{ patient[5] }}</span>
+                        {% endif %}
+                        <span style="font-size: 0.72rem; color: var(--text-ghost); font-family: var(--mono);">{{ patient[6][:10] if patient[6] else '' }}</span>
+                    </div>
+                </a>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="empty-state" style="padding: 40px 20px;">
+                <div class="empty-state-icon"><i class="fas fa-users"></i></div>
+                <p>No subjects yet. Add your first subject to begin analysis.</p>
+                <a href="{{ url_for('add_patient') }}" class="btn btn-primary btn-sm"><i class="fas fa-plus"></i> Add Subject</a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Capabilities -->
+    <div class="mt-lg">
+        <h3 style="font-size: 0.78rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-tertiary); margin-bottom: 14px;">Analysis Capabilities</h3>
+        <div class="grid grid-3">
+            <div class="card" style="border-color: rgba(56, 217, 197, 0.08);">
+                <div class="card-body">
+                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                        <i class="fas fa-project-diagram" style="color: var(--accent-cyan); font-size: 0.9rem;"></i>
+                        <span style="font-weight: 600; font-size: 0.9rem;">Static Connectivity</span>
+                    </div>
+                    <p class="card-text" style="font-size: 0.82rem; line-height: 1.5;">Pearson correlation, partial correlation, and tangent space connectivity matrices with graph-theoretic metrics.</p>
+                </div>
+            </div>
+            <div class="card" style="border-color: rgba(74, 142, 255, 0.08);">
+                <div class="card-body">
+                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                        <i class="fas fa-wave-square" style="color: var(--accent-blue); font-size: 0.9rem;"></i>
+                        <span style="font-weight: 600; font-size: 0.9rem;">Dynamic Analysis</span>
+                    </div>
+                    <p class="card-text" style="font-size: 0.82rem; line-height: 1.5;">Sliding-window connectivity with k-means state clustering, HMM state inference, switching rates, and dwell times.</p>
+                </div>
+            </div>
+            <div class="card" style="border-color: rgba(155, 109, 255, 0.08);">
+                <div class="card-body">
+                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                        <i class="fas fa-robot" style="color: var(--accent-violet); font-size: 0.9rem;"></i>
+                        <span style="font-weight: 600; font-size: 0.9rem;">AI Orchestrator</span>
+                    </div>
+                    <p class="card-text" style="font-size: 0.82rem; line-height: 1.5;">Claude-powered multi-strategy comparison. Describe your goal, get automated pipeline design and cross-strategy ranking.</p>
+                </div>
             </div>
         </div>
     </div>
 </div>
-
-<div class="row mt-4">
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="card-title mb-0">Quick Stats</h5>
-            </div>
-            <div class="card-body">
-                {% set patient_count = patients|length %}
-                <p>Number of patients: {{ patient_count }}</p>
-                <p>More statistics would be displayed here...</p>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="card-title mb-0">Recent Patients</h5>
-            </div>
-            <div class="card-body">
-                {% if patients %}
-                    <ul class="list-group list-group-flush">
-                        {% for patient in patients[:5] %}
-                            <li class="list-group-item d-flex justify-content-between align-items-center">
-                                {{ patient[2] }} ({{ patient[1] }})
-                                <span class="badge bg-primary rounded-pill">{{ patient[6] }}</span>
-                            </li>
-                        {% endfor %}
-                    </ul>
-                {% else %}
-                    <p>No patients found.</p>
-                {% endif %}
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Added visualization links -->
-<div>
-    <a href="/mri">MRI Visualization</a> |
-    <a href="/features">Features Visualization</a>
-</div>
-
 {% endblock %}

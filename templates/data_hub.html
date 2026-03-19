@@ -1,106 +1,137 @@
 {% extends "base.html" %}
-
 {% block title %}Data Hub - BrainNet{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-    <h1 class="h2"><i class="fas fa-database"></i> Data Hub</h1>
-    <a href="{{ url_for('openneuro') }}" class="btn btn-primary">
-        <i class="fas fa-search"></i> Browse OpenNeuro
-    </a>
-</div>
-
-{% if downloads %}
-<div class="mb-4">
-    <h4>Active Downloads</h4>
-    {% for dl in downloads %}
-    <div class="alert alert-info d-flex align-items-center" id="dl-{{ dl.dataset_id }}">
-        <div class="spinner-border spinner-border-sm me-2" role="status"></div>
-        <span>Downloading <strong>{{ dl.name }}</strong> ({{ dl.dataset_id }})...</span>
+<div class="page-container">
+    <div class="page-header">
+        <div>
+            <h1><i class="fas fa-database"></i>Data Hub</h1>
+            <p class="page-subtitle">Manage and browse downloaded neuroimaging datasets</p>
+        </div>
+        <a href="{{ url_for('openneuro') }}" class="btn btn-primary">
+            <i class="fas fa-search"></i> Browse OpenNeuro
+        </a>
     </div>
-    {% endfor %}
-</div>
-{% endif %}
 
-<h4 class="mb-3">Downloaded Datasets</h4>
-{% if datasets %}
-<div class="row">
-    {% for ds in datasets %}
-    <div class="col-md-4 mb-4">
-        <div class="card h-100">
-            <div class="card-body">
-                <h5 class="card-title">{{ ds.name }}</h5>
-                <h6 class="card-subtitle mb-2 text-muted">{{ ds.dataset_id }}</h6>
+    {% if downloads %}
+    <div class="mb-lg">
+        <h3 style="font-size: 0.78rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-tertiary); margin-bottom: 12px;">Active Downloads</h3>
+        {% for dl in downloads %}
+        <div class="alert alert-info" id="dl-{{ dl.dataset_id }}">
+            <i class="fas fa-circle-notch spinner"></i>
+            <div>Downloading <strong>{{ dl.name }}</strong> <span style="font-family: var(--mono); font-size: 0.82rem;">({{ dl.dataset_id }})</span></div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <h3 style="font-size: 0.78rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-tertiary); margin-bottom: 14px;">Downloaded Datasets</h3>
+
+    {% if datasets %}
+    <div class="grid grid-3">
+        {% for ds in datasets %}
+        <div class="card" style="display: flex; flex-direction: column;">
+            <div class="card-body" style="flex: 1;">
+                <div style="display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 10px;">
+                    <div>
+                        <div class="card-title" style="margin-bottom: 2px;">{{ ds.name }}</div>
+                        <div style="font-family: var(--mono); font-size: 0.75rem; color: var(--accent-cyan);">{{ ds.dataset_id }}</div>
+                    </div>
+                </div>
                 {% if ds.description %}
-                <p class="card-text small text-truncate" title="{{ ds.description }}">{{ ds.description }}</p>
+                <p class="card-text" style="margin-bottom: 12px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">{{ ds.description }}</p>
                 {% endif %}
-                <div class="mb-2">
+                <div style="display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 12px;">
                     {% for mod in ds.modalities %}
-                    <span class="badge bg-info">{{ mod }}</span>
+                    <span class="badge badge-blue">{{ mod }}</span>
                     {% endfor %}
                     {% for task in ds.tasks %}
-                    <span class="badge bg-secondary">{{ task }}</span>
+                    <span class="badge badge-violet">{{ task }}</span>
                     {% endfor %}
                 </div>
-                <ul class="list-unstyled small text-muted">
-                    {% if ds.subjects %}<li><i class="fas fa-users"></i> {{ ds.subjects }} subjects</li>{% endif %}
-                    {% if ds.sessions %}<li><i class="fas fa-clock"></i> {{ ds.sessions }} sessions</li>{% endif %}
-                    {% if ds.total_files %}<li><i class="fas fa-file"></i> {{ ds.total_files }} files</li>{% endif %}
-                </ul>
+                <div style="display: flex; gap: 16px; font-size: 0.78rem; color: var(--text-tertiary);">
+                    {% if ds.subjects %}<span><i class="fas fa-users" style="margin-right: 4px; opacity: 0.5;"></i>{{ ds.subjects }}</span>{% endif %}
+                    {% if ds.sessions %}<span><i class="fas fa-clock" style="margin-right: 4px; opacity: 0.5;"></i>{{ ds.sessions }} sess</span>{% endif %}
+                    {% if ds.total_files %}<span><i class="fas fa-file" style="margin-right: 4px; opacity: 0.5;"></i>{{ ds.total_files }}</span>{% endif %}
+                </div>
             </div>
-            <div class="card-footer d-flex justify-content-between">
-                <a href="{{ url_for('dataset_browse', dataset_id=ds.dataset_id) }}" class="btn btn-sm btn-outline-primary">
+            <div class="card-footer" style="display: flex; gap: 8px;">
+                <a href="{{ url_for('dataset_browse', dataset_id=ds.dataset_id) }}" class="btn btn-sm btn-ghost" style="flex: 1; justify-content: center;">
                     <i class="fas fa-folder-open"></i> Browse
                 </a>
-                <a href="{{ url_for('openneuro_detail', dataset_id=ds.dataset_id) }}" class="btn btn-sm btn-outline-secondary">
+                <a href="{{ url_for('openneuro_detail', dataset_id=ds.dataset_id) }}" class="btn btn-sm btn-ghost" style="flex: 1; justify-content: center;">
                     <i class="fas fa-info-circle"></i> Details
                 </a>
                 <form method="POST" action="{{ url_for('delete_dataset', dataset_id=ds.dataset_id) }}"
-                      onsubmit="return confirm('Delete this dataset and all its files from disk?')">
-                    <button type="submit" class="btn btn-sm btn-outline-danger">
-                        <i class="fas fa-trash"></i>
-                    </button>
+                      onsubmit="return confirm('Delete this dataset and all files from disk?')">
+                    <button type="submit" class="btn btn-sm btn-danger"><i class="fas fa-trash"></i></button>
                 </form>
             </div>
         </div>
+        {% endfor %}
     </div>
-    {% endfor %}
+    {% else %}
+    <div class="card">
+        <div class="empty-state">
+            <div class="empty-state-icon"><i class="fas fa-database"></i></div>
+            <p>No datasets downloaded yet. Browse OpenNeuro to find and download neuroimaging datasets.</p>
+            <a href="{{ url_for('openneuro') }}" class="btn btn-primary"><i class="fas fa-search"></i> Browse OpenNeuro</a>
+        </div>
+    </div>
+    {% endif %}
 </div>
-{% else %}
-<div class="text-center py-5">
-    <i class="fas fa-database fa-3x text-muted mb-3"></i>
-    <p class="text-muted">No datasets downloaded yet.</p>
-    <a href="{{ url_for('openneuro') }}" class="btn btn-primary">
-        <i class="fas fa-search"></i> Browse OpenNeuro to get started
-    </a>
-</div>
-{% endif %}
 {% endblock %}
 
 {% block scripts %}
 {% if downloads %}
 <script>
-$(function() {
+(function() {
     var ids = [{% for dl in downloads %}"{{ dl.dataset_id }}"{% if not loop.last %},{% endif %}{% endfor %}];
     if (!ids.length) return;
     var poll = setInterval(function() {
         var done = 0;
         ids.forEach(function(id) {
-            $.getJSON("{{ url_for('api_download_status', dataset_id='__ID__') }}".replace('__ID__', id), function(data) {
-                if (data.status === 'completed') {
-                    $('#dl-' + id).removeClass('alert-info').addClass('alert-success')
-                        .html('<i class="fas fa-check-circle me-2"></i> <strong>' + id + '</strong> downloaded successfully. <a href="' + window.location.href + '">Refresh</a>');
-                    done++;
-                } else if (data.status === 'failed') {
-                    $('#dl-' + id).removeClass('alert-info').addClass('alert-danger')
-                        .html('<i class="fas fa-exclamation-circle me-2"></i> <strong>' + id + '</strong> download failed: ' + (data.error || 'Unknown error'));
-                    done++;
-                }
-            });
+            fetch("{{ url_for('api_download_status', dataset_id='__ID__') }}".replace('__ID__', id))
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    var el = document.getElementById('dl-' + id);
+                    if (!el) return;
+                    if (data.status === 'completed') {
+                        el.className = 'alert alert-success';
+                        while (el.firstChild) el.removeChild(el.firstChild);
+                        var icon = document.createElement('i');
+                        icon.className = 'fas fa-check-circle';
+                        el.appendChild(icon);
+                        var info = document.createElement('div');
+                        var b = document.createElement('strong');
+                        b.textContent = id;
+                        info.appendChild(b);
+                        info.appendChild(document.createTextNode(' downloaded. '));
+                        var link = document.createElement('a');
+                        link.href = location.href;
+                        link.textContent = 'Refresh';
+                        info.appendChild(link);
+                        el.appendChild(info);
+                        done++;
+                    } else if (data.status === 'failed') {
+                        el.className = 'alert alert-danger';
+                        while (el.firstChild) el.removeChild(el.firstChild);
+                        var errIcon = document.createElement('i');
+                        errIcon.className = 'fas fa-exclamation-circle';
+                        el.appendChild(errIcon);
+                        var errInfo = document.createElement('div');
+                        var errB = document.createElement('strong');
+                        errB.textContent = id;
+                        errInfo.appendChild(errB);
+                        errInfo.appendChild(document.createTextNode(' failed: ' + (data.error || 'Unknown')));
+                        el.appendChild(errInfo);
+                        done++;
+                    }
+                });
         });
         if (done >= ids.length) clearInterval(poll);
     }, 3000);
-});
+})();
 </script>
 {% endif %}
 {% endblock %}

@@ -1,33 +1,112 @@
 {% extends "base.html" %}
+{% block title %}Network Visualization - BrainNet{% endblock %}
 
-{% block title %}Network Visualization - BrainNet MRI Data Management{% endblock %}
+{% block head %}
+<style>
+    .viz-layout {
+        display: grid;
+        grid-template-columns: 1fr 360px;
+        gap: 20px;
+    }
+
+    .network-canvas {
+        background: var(--bg-deep);
+        border: 1px solid var(--border-default);
+        border-radius: var(--radius-md);
+        height: 560px;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .network-canvas::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background:
+            radial-gradient(circle at 30% 40%, rgba(56, 217, 197, 0.03), transparent 50%),
+            radial-gradient(circle at 70% 60%, rgba(74, 142, 255, 0.03), transparent 50%);
+        pointer-events: none;
+    }
+
+    #cy { width: 100%; height: 100%; }
+
+    .feature-panel .chart-wrap {
+        background: var(--bg-deep);
+        border: 1px solid var(--border-subtle);
+        border-radius: var(--radius-sm);
+        padding: 16px;
+    }
+
+    @media (max-width: 1024px) {
+        .viz-layout { grid-template-columns: 1fr; }
+        .network-canvas { height: 400px; }
+    }
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="container my-4">
-    <h2>Brain Network Visualization</h2>
-    <p>This page displays the computed brain network and its dynamic features.</p>
-    <div class="row mb-4">
-        <div class="col-md-8">
-            <div id="cy" style="width: 100%; height: 500px; border: 1px solid #ccc;"></div>
+<div class="page-container wide">
+    <div class="page-header">
+        <div>
+            <h1><i class="fas fa-project-diagram"></i>Network Visualization</h1>
+            <p class="page-subtitle">Interactive brain network graph and dynamic feature trajectories</p>
         </div>
-        <div class="col-md-4">
-            <h5>Network Dynamic Features</h5>
-            <canvas id="featureChart" width="400" height="400"></canvas>
+    </div>
+
+    <div class="viz-layout">
+        <div class="network-canvas">
+            <div id="cy"></div>
+        </div>
+
+        <div class="feature-panel" style="display: flex; flex-direction: column; gap: 16px;">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Network Metrics</h5>
+                </div>
+                <div class="card-body">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                        <div class="stat-card" style="padding: 14px;">
+                            <div class="stat-label">Nodes</div>
+                            <div class="stat-value cyan" style="font-size: 1.3rem;" id="nodeCount">--</div>
+                        </div>
+                        <div class="stat-card" style="padding: 14px;">
+                            <div class="stat-label">Edges</div>
+                            <div class="stat-value blue" style="font-size: 1.3rem;" id="edgeCount">--</div>
+                        </div>
+                        <div class="stat-card" style="padding: 14px;">
+                            <div class="stat-label">Density</div>
+                            <div class="stat-value violet" style="font-size: 1.3rem;" id="density">--</div>
+                        </div>
+                        <div class="stat-card" style="padding: 14px;">
+                            <div class="stat-label">Components</div>
+                            <div class="stat-value amber" style="font-size: 1.3rem;" id="components">--</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card" style="flex: 1;">
+                <div class="card-header">
+                    <h5>Dynamic Features</h5>
+                </div>
+                <div class="card-body">
+                    <div class="chart-wrap">
+                        <canvas id="featureChart" height="220"></canvas>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>
+{% endblock %}
 
-<!-- Include Cytoscape.js for network visualization -->
+{% block scripts %}
 <script src="https://unpkg.com/cytoscape@3.21.1/dist/cytoscape.min.js"></script>
-<!-- Include Chart.js for dynamic features -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
 <script>
-// Load network data from the API
 fetch("{{ url_for('api_network_data') }}")
-    .then(response => response.json())
-    .then(data => {
-        // Initialize Cytoscape with fetched data
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
         var cy = cytoscape({
             container: document.getElementById('cy'),
             elements: data.elements,
@@ -35,54 +114,85 @@ fetch("{{ url_for('api_network_data') }}")
                 {
                     selector: 'node',
                     style: {
-                        'background-color': '#007bff',
+                        'background-color': '#38d9c5',
                         'label': 'data(label)',
-                        'color': '#fff',
+                        'color': '#e4e8f0',
                         'text-valign': 'center',
-                        'text-halign': 'center'
+                        'text-halign': 'center',
+                        'font-size': '10px',
+                        'font-family': "'DM Sans', sans-serif",
+                        'width': 28,
+                        'height': 28,
+                        'border-width': 2,
+                        'border-color': 'rgba(56, 217, 197, 0.3)',
+                        'text-outline-width': 2,
+                        'text-outline-color': '#0a0c14'
                     }
                 },
                 {
                     selector: 'edge',
                     style: {
-                        'width': 2,
-                        'line-color': '#ccc'
+                        'width': 1.5,
+                        'line-color': 'rgba(74, 142, 255, 0.25)',
+                        'curve-style': 'bezier'
                     }
                 }
             ],
-            layout: {
-                name: 'cose'
-            }
+            layout: { name: 'cose', animate: true, animationDuration: 800 }
         });
+
+        var nodes = cy.nodes().length;
+        var edges = cy.edges().length;
+        document.getElementById('nodeCount').textContent = nodes;
+        document.getElementById('edgeCount').textContent = edges;
+        var maxEdges = nodes * (nodes - 1) / 2;
+        document.getElementById('density').textContent = maxEdges > 0 ? (edges / maxEdges).toFixed(3) : '--';
+        document.getElementById('components').textContent = '1';
+    })
+    .catch(function() {
+        document.getElementById('nodeCount').textContent = '0';
+        document.getElementById('edgeCount').textContent = '0';
     });
 
-// Example dynamic features chart using Chart.js
-const ctx = document.getElementById('featureChart').getContext('2d');
-const featureChart = new Chart(ctx, {
+Chart.defaults.color = '#5a6378';
+Chart.defaults.borderColor = 'rgba(100, 180, 220, 0.06)';
+Chart.defaults.font.family = "'DM Sans', sans-serif";
+
+var ctx = document.getElementById('featureChart').getContext('2d');
+new Chart(ctx, {
     type: 'line',
     data: {
-        labels: ['Time 1', 'Time 2', 'Time 3', 'Time 4', 'Time 5'],
+        labels: ['T1', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'T8'],
         datasets: [{
-            label: 'Network Feature 1',
-            data: [5, 6, 7, 8, 7],
-            borderColor: 'rgba(255, 99, 132, 1)',
-            backgroundColor: 'rgba(255, 99, 132, 0.2)',
-            fill: true
+            label: 'Modularity',
+            data: [0.45, 0.52, 0.48, 0.61, 0.58, 0.55, 0.62, 0.59],
+            borderColor: 'rgba(56, 217, 197, 0.8)',
+            backgroundColor: 'rgba(56, 217, 197, 0.08)',
+            fill: true,
+            tension: 0.3,
+            pointRadius: 3,
+            pointBackgroundColor: '#38d9c5'
         }, {
-            label: 'Network Feature 2',
-            data: [3, 4, 3, 5, 6],
-            borderColor: 'rgba(54, 162, 235, 1)',
-            backgroundColor: 'rgba(54, 162, 235, 0.2)',
-            fill: true
+            label: 'Efficiency',
+            data: [0.71, 0.68, 0.72, 0.65, 0.69, 0.73, 0.67, 0.70],
+            borderColor: 'rgba(74, 142, 255, 0.8)',
+            backgroundColor: 'rgba(74, 142, 255, 0.08)',
+            fill: true,
+            tension: 0.3,
+            pointRadius: 3,
+            pointBackgroundColor: '#4a8eff'
         }]
     },
     options: {
         responsive: true,
+        plugins: {
+            legend: { position: 'bottom', labels: { boxWidth: 10, padding: 16, font: { size: 11 } } }
+        },
         scales: {
-            y: { beginAtZero: true }
+            y: { beginAtZero: false, grid: { color: 'rgba(100, 180, 220, 0.04)' } },
+            x: { grid: { display: false } }
         }
     }
 });
 </script>
-
 {% endblock %}

@@ -1,277 +1,541 @@
 {% extends "base.html" %}
 {% block title %}Analysis Chat - BrainNet{% endblock %}
 
-{% block content %}
+{% block head %}
 <style>
-    body {
-        background-color: #0a0a14 !important;
+    .nav-bar + .flash-container { display: none; }
+
+    .chat-layout {
+        display: flex;
+        height: calc(100vh - 52px);
+        overflow: hidden;
     }
-    .chat-page .main-content {
-        margin-left: 0 !important;
-        padding: 0 !important;
-    }
-    .chat-wrapper {
+
+    /* ── Sidebar ────────────────────────────────────── */
+    .chat-sidebar {
+        width: 260px;
+        flex-shrink: 0;
+        background: var(--bg-deep);
+        border-right: 1px solid var(--border-subtle);
         display: flex;
         flex-direction: column;
-        height: calc(100vh - 56px);
-        background-color: #0a0a14;
     }
-    .chat-header {
+
+    .chat-sidebar-header {
+        padding: 16px 18px;
+        border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .btn-new-chat {
+        width: 100%;
         display: flex;
         align-items: center;
-        justify-content: space-between;
-        padding: 12px 24px;
-        background-color: #1a1a2e;
-        border-bottom: 1px solid #2a2a4a;
-    }
-    .chat-header h5 {
-        margin: 0;
-        color: #e0e0ff;
-        font-weight: 600;
-    }
-    .btn-new-session {
-        background-color: #2a2a4a;
-        color: #b0b0e0;
-        border: 1px solid #3a3a5a;
-        border-radius: 6px;
-        padding: 6px 14px;
+        justify-content: center;
+        gap: 8px;
+        padding: 9px 16px;
+        border-radius: var(--radius-sm);
+        background: var(--accent-cyan-glow);
+        border: 1px solid rgba(56, 217, 197, 0.15);
+        color: var(--accent-cyan);
+        font-family: var(--sans);
         font-size: 0.85rem;
+        font-weight: 500;
         cursor: pointer;
-        transition: background-color 0.2s;
+        transition: all var(--transition-fast);
     }
-    .btn-new-session:hover {
-        background-color: #3a3a5a;
-        color: #e0e0ff;
+
+    .btn-new-chat:hover {
+        background: var(--accent-cyan-strong);
+        border-color: rgba(56, 217, 197, 0.3);
     }
+
+    .chat-sidebar-tools {
+        flex: 1;
+        padding: 14px 12px;
+        overflow-y: auto;
+    }
+
+    .sidebar-section-label {
+        font-size: 0.68rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--text-ghost);
+        padding: 0 6px;
+        margin-bottom: 8px;
+    }
+
+    .tool-list {
+        list-style: none;
+        margin-bottom: 20px;
+    }
+
+    .tool-item {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        padding: 7px 10px;
+        border-radius: var(--radius-sm);
+        font-size: 0.8rem;
+        color: var(--text-tertiary);
+        transition: all var(--transition-fast);
+    }
+
+    .tool-item i {
+        width: 16px;
+        text-align: center;
+        font-size: 0.75rem;
+    }
+
+    .tool-item .tool-badge {
+        margin-left: auto;
+        font-family: var(--mono);
+        font-size: 0.65rem;
+        padding: 1px 6px;
+        border-radius: 10px;
+        background: var(--bg-overlay);
+        color: var(--text-ghost);
+    }
+
+    /* ── Main Chat Area ─────────────────────────────── */
+    .chat-main {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        background: var(--bg-void);
+        min-width: 0;
+    }
+
     .chat-messages {
         flex: 1;
         overflow-y: auto;
-        padding: 24px;
+        padding: 24px 0;
+    }
+
+    .chat-messages-inner {
+        max-width: 780px;
+        margin: 0 auto;
+        padding: 0 24px;
         display: flex;
         flex-direction: column;
-        gap: 16px;
+        gap: 20px;
     }
-    .chat-messages::-webkit-scrollbar {
-        width: 6px;
-    }
-    .chat-messages::-webkit-scrollbar-track {
-        background: #0a0a14;
-    }
-    .chat-messages::-webkit-scrollbar-thumb {
-        background: #2a2a4a;
-        border-radius: 3px;
-    }
+
+    /* ── Messages ───────────────────────────────────── */
     .msg {
-        max-width: 75%;
-        padding: 12px 16px;
-        border-radius: 12px;
-        font-size: 0.95rem;
-        line-height: 1.6;
+        display: flex;
+        gap: 14px;
+        animation: msg-in 0.3s ease;
+    }
+
+    @keyframes msg-in {
+        from { opacity: 0; transform: translateY(8px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    .msg-avatar {
+        width: 30px;
+        height: 30px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.75rem;
+        font-weight: 600;
+        flex-shrink: 0;
+        margin-top: 2px;
+    }
+
+    .msg-user .msg-avatar {
+        background: var(--bg-overlay);
+        color: var(--text-secondary);
+        border: 1px solid var(--border-default);
+    }
+
+    .msg-assistant .msg-avatar {
+        background: linear-gradient(135deg, rgba(56, 217, 197, 0.2), rgba(74, 142, 255, 0.2));
+        color: var(--accent-cyan);
+        border: 1px solid rgba(56, 217, 197, 0.15);
+    }
+
+    .msg-body {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .msg-sender {
+        font-size: 0.75rem;
+        font-weight: 600;
+        margin-bottom: 4px;
+        letter-spacing: 0.01em;
+    }
+
+    .msg-user .msg-sender { color: var(--text-tertiary); }
+    .msg-assistant .msg-sender { color: var(--accent-cyan); }
+
+    .msg-content {
+        font-size: 0.9rem;
+        line-height: 1.65;
+        color: var(--text-primary);
         white-space: pre-wrap;
         word-wrap: break-word;
     }
-    .msg-user {
-        align-self: flex-end;
-        background-color: #2a2a4a;
-        color: #e0e0ff;
-        border-bottom-right-radius: 4px;
-    }
-    .msg-assistant {
-        align-self: flex-start;
-        background-color: #1a1a2e;
-        color: #d0d0f0;
-        border-left: 3px solid #7c7cff;
-        border-bottom-left-radius: 4px;
-    }
-    .msg-label {
-        font-size: 0.7rem;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        color: #7c7cff;
-        margin-bottom: 4px;
-        font-weight: 600;
-    }
-    .msg-user .msg-label {
-        text-align: right;
-        color: #9090c0;
-    }
-    .tool-indicator {
+
+    .msg-user .msg-content { color: var(--text-secondary); }
+
+    /* ── Tool Calls ─────────────────────────────────── */
+    .tool-call {
         display: flex;
         align-items: center;
-        gap: 8px;
-        margin-top: 8px;
-        padding: 6px 10px;
-        background-color: #12121e;
-        border-radius: 6px;
-        font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
-        font-size: 0.8rem;
-        color: #a0a0c0;
+        gap: 10px;
+        margin-top: 10px;
+        padding: 8px 14px;
+        background: var(--bg-surface);
+        border: 1px solid var(--border-subtle);
+        border-radius: var(--radius-sm);
+        font-family: var(--mono);
+        font-size: 0.78rem;
+        transition: border-color var(--transition-fast);
     }
-    .tool-indicator .tool-icon {
+
+    .tool-call:hover { border-color: var(--border-strong); }
+
+    .tool-call-icon {
         font-size: 0.85rem;
         flex-shrink: 0;
+        width: 18px;
+        text-align: center;
     }
-    .tool-indicator .tool-icon.running {
-        color: #f0a040;
+
+    .tool-call-icon.running {
+        color: var(--accent-amber);
+        animation: pulse-glow 1.5s ease infinite;
     }
-    .tool-indicator .tool-icon.done {
-        color: #40c060;
-    }
-    .tool-indicator .tool-icon.error {
-        color: #e05050;
-    }
-    .tool-indicator .tool-name {
+
+    .tool-call-icon.done { color: var(--accent-emerald); }
+    .tool-call-icon.error { color: var(--accent-rose); }
+
+    .tool-call-name {
         font-weight: 600;
-        color: #b0b0e0;
+        color: var(--text-primary);
     }
-    .tool-indicator .tool-params {
-        color: #707090;
-        font-size: 0.75rem;
+
+    .tool-call-detail {
+        flex: 1;
+        min-width: 0;
+        color: var(--text-tertiary);
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
-        max-width: 400px;
     }
-    .tool-indicator .tool-summary {
-        color: #90c090;
-        font-size: 0.75rem;
+
+    .tool-call-status {
+        flex-shrink: 0;
+        font-size: 0.7rem;
+        padding: 2px 8px;
+        border-radius: 10px;
     }
-    .chat-input-area {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        padding: 16px 24px;
-        background-color: #1a1a2e;
-        border-top: 1px solid #2a2a4a;
+
+    .tool-call-status.running {
+        color: var(--accent-amber);
+        background: rgba(255, 179, 71, 0.1);
     }
-    .chat-input-area textarea {
-        flex: 1;
-        background-color: #12121e;
-        border: 1px solid #2a2a4a;
-        border-radius: 8px;
-        color: #e0e0ff;
-        padding: 10px 14px;
-        font-size: 0.95rem;
-        resize: none;
-        outline: none;
-        min-height: 44px;
-        max-height: 120px;
-        line-height: 1.4;
+
+    .tool-call-status.done {
+        color: var(--accent-emerald);
+        background: rgba(71, 217, 138, 0.1);
     }
-    .chat-input-area textarea::placeholder {
-        color: #505070;
+
+    .tool-call-status.error {
+        color: var(--accent-rose);
+        background: rgba(255, 107, 138, 0.1);
     }
-    .chat-input-area textarea:focus {
-        border-color: #7c7cff;
-    }
-    .btn-send {
-        background-color: #7c7cff;
-        color: #fff;
-        border: none;
-        border-radius: 8px;
-        padding: 10px 20px;
-        font-size: 0.95rem;
-        font-weight: 600;
-        cursor: pointer;
-        transition: background-color 0.2s;
-        white-space: nowrap;
-    }
-    .btn-send:hover {
-        background-color: #6a6aee;
-    }
-    .btn-send:disabled {
-        background-color: #3a3a5a;
-        color: #606080;
-        cursor: not-allowed;
-    }
-    .api-error-box {
-        background-color: #2a1a1a;
-        border: 1px solid #5a2a2a;
-        border-radius: 8px;
-        padding: 20px;
-        margin: 24px;
-        color: #e0a0a0;
-    }
-    .api-error-box .error-icon {
-        color: #e05050;
-        margin-right: 8px;
-    }
-    .empty-state {
+
+    /* ── Empty State ────────────────────────────────── */
+    .chat-empty {
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
         flex: 1;
-        color: #505070;
         text-align: center;
+        padding: 40px;
+    }
+
+    .chat-empty-orb {
+        width: 80px;
+        height: 80px;
+        border-radius: 50%;
+        background: radial-gradient(circle at 35% 35%, rgba(56, 217, 197, 0.12), rgba(74, 142, 255, 0.06), transparent 70%);
+        border: 1px solid rgba(56, 217, 197, 0.08);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 20px;
+        animation: orb-breathe 4s ease infinite;
+    }
+
+    @keyframes orb-breathe {
+        0%, 100% { transform: scale(1); box-shadow: 0 0 40px rgba(56, 217, 197, 0.03); }
+        50% { transform: scale(1.04); box-shadow: 0 0 60px rgba(56, 217, 197, 0.06); }
+    }
+
+    .chat-empty-orb i { font-size: 1.8rem; color: var(--accent-cyan); opacity: 0.6; }
+
+    .chat-empty h3 {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: var(--text-primary);
+        margin-bottom: 8px;
+        letter-spacing: -0.02em;
+    }
+
+    .chat-empty p {
+        font-size: 0.85rem;
+        color: var(--text-tertiary);
+        max-width: 420px;
+        line-height: 1.6;
+        margin-bottom: 24px;
+    }
+
+    .chat-suggestions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        justify-content: center;
+        max-width: 560px;
+    }
+
+    .chat-suggestion {
+        padding: 7px 14px;
+        background: var(--bg-surface);
+        border: 1px solid var(--border-default);
+        border-radius: 20px;
+        font-size: 0.8rem;
+        color: var(--text-secondary);
+        cursor: pointer;
+        transition: all var(--transition-fast);
+    }
+
+    .chat-suggestion:hover {
+        color: var(--accent-cyan);
+        border-color: rgba(56, 217, 197, 0.2);
+        background: var(--accent-cyan-glow);
+    }
+
+    /* ── Input Area ─────────────────────────────────── */
+    .chat-input-container {
+        border-top: 1px solid var(--border-subtle);
+        background: var(--bg-deep);
+        padding: 16px 24px;
+    }
+
+    .chat-input-inner {
+        max-width: 780px;
+        margin: 0 auto;
+        display: flex;
+        align-items: flex-end;
         gap: 12px;
     }
-    .empty-state .empty-icon {
-        font-size: 3rem;
-        color: #3a3a5a;
+
+    .chat-input-wrap {
+        flex: 1;
+        position: relative;
     }
-    .empty-state p {
+
+    .chat-input-wrap textarea {
+        width: 100%;
+        resize: none;
+        padding: 12px 16px;
+        background: var(--bg-surface);
+        border: 1px solid var(--border-default);
+        border-radius: var(--radius-md);
+        color: var(--text-primary);
+        font-family: var(--sans);
+        font-size: 0.9rem;
+        line-height: 1.5;
+        outline: none;
+        min-height: 46px;
+        max-height: 160px;
+        transition: border-color var(--transition-fast);
+    }
+
+    .chat-input-wrap textarea:focus {
+        border-color: var(--accent-cyan);
+        box-shadow: 0 0 0 2px var(--accent-cyan-glow);
+    }
+
+    .chat-input-wrap textarea::placeholder { color: var(--text-ghost); }
+
+    .btn-send {
+        width: 46px;
+        height: 46px;
+        border-radius: var(--radius-md);
+        background: var(--accent-cyan);
+        border: none;
+        color: var(--bg-void);
         font-size: 1rem;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all var(--transition-fast);
+        flex-shrink: 0;
+    }
+
+    .btn-send:hover {
+        background: #4ee6d2;
+        box-shadow: 0 0 20px rgba(56, 217, 197, 0.3);
+    }
+
+    .btn-send:disabled {
+        background: var(--bg-overlay);
+        color: var(--text-ghost);
+        cursor: not-allowed;
+        box-shadow: none;
+    }
+
+    .input-hint {
+        font-size: 0.7rem;
+        color: var(--text-ghost);
+        margin-top: 6px;
+        text-align: center;
+    }
+
+    /* ── API Error ──────────────────────────────────── */
+    .chat-api-error {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        flex: 1;
+        padding: 40px;
+        text-align: center;
+    }
+
+    .chat-api-error .error-icon {
+        width: 56px;
+        height: 56px;
+        border-radius: 50%;
+        background: rgba(255, 107, 138, 0.08);
+        border: 1px solid rgba(255, 107, 138, 0.12);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.3rem;
+        color: var(--accent-rose);
+        margin-bottom: 16px;
+    }
+
+    .chat-api-error h3 {
+        font-size: 1rem;
+        font-weight: 600;
+        color: var(--text-primary);
+        margin-bottom: 6px;
+    }
+
+    .chat-api-error p {
+        font-size: 0.85rem;
+        color: var(--text-tertiary);
         max-width: 400px;
     }
-    @keyframes spin {
-        to { transform: rotate(360deg); }
-    }
-    .spinner {
-        display: inline-block;
-        animation: spin 1s linear infinite;
+
+    @media (max-width: 768px) {
+        .chat-sidebar { display: none; }
+        .chat-messages-inner, .chat-input-inner { padding: 0 16px; }
     }
 </style>
+{% endblock %}
 
-<div class="chat-wrapper">
-    <div class="chat-header">
-        <h5><i class="fas fa-comments"></i> Analysis Chat</h5>
-        <button class="btn-new-session" onclick="newSession()" title="Start a new conversation">
-            <i class="fas fa-plus"></i> New Session
-        </button>
-    </div>
-
-    {% if api_error %}
-    <div class="api-error-box">
-        <span class="error-icon"><i class="fas fa-exclamation-triangle"></i></span>
-        <strong>API Configuration Error:</strong> {{ api_error }}
-    </div>
-    {% else %}
-    <div class="chat-messages" id="chatMessages">
-        <div class="empty-state" id="emptyState">
-            <span class="empty-icon"><i class="fas fa-brain"></i></span>
-            <p>Start a conversation with BrainNet to analyze your neuroimaging data, compare strategies, or explore results.</p>
+{% block content %}
+<div class="chat-layout">
+    <!-- Sidebar -->
+    <aside class="chat-sidebar">
+        <div class="chat-sidebar-header">
+            <button class="btn-new-chat" onclick="newSession()">
+                <i class="fas fa-plus"></i> New Analysis
+            </button>
         </div>
-    </div>
+        <div class="chat-sidebar-tools">
+            <div class="sidebar-section-label">Available Tools</div>
+            <ul class="tool-list">
+                <li class="tool-item"><i class="fas fa-download" style="color: var(--accent-cyan);"></i> load_dataset</li>
+                <li class="tool-item"><i class="fas fa-list" style="color: var(--accent-cyan);"></i> list_subjects</li>
+                <li class="tool-item"><i class="fas fa-cogs" style="color: var(--accent-blue);"></i> preprocess</li>
+                <li class="tool-item"><i class="fas fa-search" style="color: var(--accent-blue);"></i> inspect_qc</li>
+                <li class="tool-item"><i class="fas fa-project-diagram" style="color: var(--accent-violet);"></i> static_connectivity</li>
+                <li class="tool-item"><i class="fas fa-wave-square" style="color: var(--accent-violet);"></i> dynamic_connectivity</li>
+                <li class="tool-item"><i class="fas fa-chart-bar" style="color: var(--accent-amber);"></i> extract_features</li>
+                <li class="tool-item"><i class="fas fa-balance-scale" style="color: var(--accent-amber);"></i> compare_strategies</li>
+                <li class="tool-item"><i class="fas fa-file-alt" style="color: var(--accent-emerald);"></i> generate_report</li>
+            </ul>
 
-    <div class="chat-input-area">
-        <textarea id="chatInput" rows="1" placeholder="Ask BrainNet about your analysis..."
-                  onkeydown="handleKeyDown(event)"></textarea>
-        <button class="btn-send" id="btnSend" onclick="sendMessage()">
-            <i class="fas fa-paper-plane"></i> Send
-        </button>
-    </div>
-    {% endif %}
+            <div class="sidebar-section-label">Session</div>
+            <div style="padding: 4px 10px;">
+                <div style="font-family: var(--mono); font-size: 0.72rem; color: var(--text-ghost);" id="sessionIndicator">No active session</div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main chat area -->
+    <main class="chat-main">
+        {% if api_error %}
+        <div class="chat-api-error">
+            <div class="error-icon"><i class="fas fa-exclamation-triangle"></i></div>
+            <h3>API Not Configured</h3>
+            <p>{{ api_error }}</p>
+        </div>
+        {% else %}
+        <div class="chat-messages" id="chatMessages">
+            <div class="chat-messages-inner" id="chatMessagesInner">
+                <div class="chat-empty" id="emptyState">
+                    <div class="chat-empty-orb"><i class="fas fa-brain"></i></div>
+                    <h3>BrainNet Analysis Orchestrator</h3>
+                    <p>Describe your analysis goal and I'll design multi-strategy workflows, execute them, and compare results across approaches.</p>
+                    <div class="chat-suggestions">
+                        <div class="chat-suggestion" onclick="useSuggestion(this)">Analyze resting-state connectivity for sub-01</div>
+                        <div class="chat-suggestion" onclick="useSuggestion(this)">Compare static vs dynamic approaches</div>
+                        <div class="chat-suggestion" onclick="useSuggestion(this)">Run QC and preprocess ds000228</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="chat-input-container">
+            <div class="chat-input-inner">
+                <div class="chat-input-wrap">
+                    <textarea id="chatInput" rows="1" placeholder="Describe your analysis goal..."
+                              onkeydown="handleKeyDown(event)"></textarea>
+                </div>
+                <button class="btn-send" id="btnSend" onclick="sendMessage()" title="Send message">
+                    <i class="fas fa-arrow-up"></i>
+                </button>
+            </div>
+            <div class="input-hint">Press Enter to send, Shift+Enter for new line</div>
+        </div>
+        {% endif %}
+    </main>
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
 (function() {
-    let sessionId = null;
-    let currentAssistantBubble = null;
-    let isSending = false;
+    var sessionId = null;
+    var currentAssistantMsg = null;
+    var isSending = false;
 
-    const chatMessages = document.getElementById('chatMessages');
-    const chatInput = document.getElementById('chatInput');
-    const btnSend = document.getElementById('btnSend');
-    const emptyState = document.getElementById('emptyState');
+    var chatMessages = document.getElementById('chatMessages');
+    var chatInner = document.getElementById('chatMessagesInner');
+    var chatInput = document.getElementById('chatInput');
+    var btnSend = document.getElementById('btnSend');
+    var emptyState = document.getElementById('emptyState');
+    var sessionIndicator = document.getElementById('sessionIndicator');
 
-    // Auto-resize textarea
     if (chatInput) {
         chatInput.addEventListener('input', function() {
             this.style.height = 'auto';
-            this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+            this.style.height = Math.min(this.scrollHeight, 160) + 'px';
         });
     }
 
@@ -284,145 +548,110 @@
     window.handleKeyDown = handleKeyDown;
 
     function scrollToBottom() {
-        if (chatMessages) {
-            chatMessages.scrollTop = chatMessages.scrollHeight;
-        }
+        if (chatMessages) chatMessages.scrollTop = chatMessages.scrollHeight;
     }
 
     function hideEmptyState() {
-        if (emptyState) {
-            emptyState.style.display = 'none';
-        }
+        if (emptyState) emptyState.style.display = 'none';
     }
 
     function addUserMessage(text) {
         hideEmptyState();
-        const div = document.createElement('div');
-        div.className = 'msg msg-user';
-
-        const label = document.createElement('div');
-        label.className = 'msg-label';
-        label.textContent = 'You';
-        div.appendChild(label);
-
-        const content = document.createElement('span');
-        content.textContent = text;
-        div.appendChild(content);
-
-        chatMessages.appendChild(div);
+        var msg = document.createElement('div');
+        msg.className = 'msg msg-user';
+        msg.innerHTML = '<div class="msg-avatar"><i class="fas fa-user"></i></div>' +
+            '<div class="msg-body"><div class="msg-sender">You</div><div class="msg-content"></div></div>';
+        msg.querySelector('.msg-content').textContent = text;
+        chatInner.appendChild(msg);
         scrollToBottom();
     }
 
-    function createAssistantBubble() {
+    function createAssistantMessage() {
         hideEmptyState();
-        const div = document.createElement('div');
-        div.className = 'msg msg-assistant';
-
-        const label = document.createElement('div');
-        label.className = 'msg-label';
-        label.textContent = 'BrainNet';
-        div.appendChild(label);
-
-        const contentSpan = document.createElement('span');
-        contentSpan.className = 'assistant-content';
-        div.appendChild(contentSpan);
-
-        chatMessages.appendChild(div);
-        currentAssistantBubble = div;
+        var msg = document.createElement('div');
+        msg.className = 'msg msg-assistant';
+        msg.innerHTML = '<div class="msg-avatar"><i class="fas fa-brain"></i></div>' +
+            '<div class="msg-body"><div class="msg-sender">BrainNet</div><div class="msg-content"></div></div>';
+        chatInner.appendChild(msg);
+        currentAssistantMsg = msg;
         scrollToBottom();
-        return div;
+        return msg;
     }
 
     function appendText(text) {
-        if (!currentAssistantBubble) {
-            createAssistantBubble();
-        }
-        const content = currentAssistantBubble.querySelector('.assistant-content');
-        if (content) {
-            content.textContent += text;
-        }
+        if (!currentAssistantMsg) createAssistantMessage();
+        var content = currentAssistantMsg.querySelector('.msg-content');
+        if (content) content.textContent += text;
         scrollToBottom();
     }
-    window.appendText = appendText;
 
     function showToolStart(name, params) {
-        if (!currentAssistantBubble) {
-            createAssistantBubble();
-        }
-        const indicator = document.createElement('div');
-        indicator.className = 'tool-indicator';
-        indicator.setAttribute('data-tool-name', name);
+        if (!currentAssistantMsg) createAssistantMessage();
+        var body = currentAssistantMsg.querySelector('.msg-body');
+        var tc = document.createElement('div');
+        tc.className = 'tool-call';
+        tc.setAttribute('data-tool-name', name);
 
-        const iconSpan = document.createElement('span');
-        iconSpan.className = 'tool-icon running spinner';
-        const iconI = document.createElement('i');
-        iconI.className = 'fas fa-circle-notch';
-        iconSpan.appendChild(iconI);
+        var icon = document.createElement('span');
+        icon.className = 'tool-call-icon running';
+        icon.innerHTML = '<i class="fas fa-circle-notch spinner"></i>';
 
-        const nameSpan = document.createElement('span');
-        nameSpan.className = 'tool-name';
-        nameSpan.textContent = name;
+        var nameEl = document.createElement('span');
+        nameEl.className = 'tool-call-name';
+        nameEl.textContent = name;
 
-        const paramsSpan = document.createElement('span');
-        paramsSpan.className = 'tool-params';
-        const paramsStr = typeof params === 'object' ? JSON.stringify(params) : (params || '');
-        paramsSpan.textContent = paramsStr;
+        var detail = document.createElement('span');
+        detail.className = 'tool-call-detail';
+        detail.textContent = typeof params === 'object' ? JSON.stringify(params) : (params || '');
 
-        indicator.appendChild(iconSpan);
-        indicator.appendChild(nameSpan);
-        indicator.appendChild(paramsSpan);
+        var status = document.createElement('span');
+        status.className = 'tool-call-status running';
+        status.textContent = 'running';
 
-        currentAssistantBubble.appendChild(indicator);
+        tc.appendChild(icon);
+        tc.appendChild(nameEl);
+        tc.appendChild(detail);
+        tc.appendChild(status);
+        body.appendChild(tc);
         scrollToBottom();
     }
-    window.showToolStart = showToolStart;
 
     function showToolResult(name, summary) {
-        if (!currentAssistantBubble) return;
-        const indicators = currentAssistantBubble.querySelectorAll(
-            '.tool-indicator[data-tool-name="' + CSS.escape(name) + '"]'
-        );
-        const indicator = indicators.length > 0 ? indicators[indicators.length - 1] : null;
-        if (indicator) {
-            const icon = indicator.querySelector('.tool-icon');
-            icon.className = 'tool-icon done';
-            while (icon.firstChild) icon.removeChild(icon.firstChild);
-            const checkIcon = document.createElement('i');
-            checkIcon.className = 'fas fa-check-circle';
-            icon.appendChild(checkIcon);
+        if (!currentAssistantMsg) return;
+        var tools = currentAssistantMsg.querySelectorAll('.tool-call[data-tool-name="' + CSS.escape(name) + '"]');
+        var tc = tools.length > 0 ? tools[tools.length - 1] : null;
+        if (!tc) return;
 
-            const paramsEl = indicator.querySelector('.tool-params');
-            if (paramsEl) {
-                paramsEl.className = 'tool-summary';
-                paramsEl.textContent = summary || 'Done';
-            }
-        }
+        var icon = tc.querySelector('.tool-call-icon');
+        icon.className = 'tool-call-icon done';
+        icon.innerHTML = '<i class="fas fa-check"></i>';
+
+        var detail = tc.querySelector('.tool-call-detail');
+        if (detail) detail.textContent = summary || 'Complete';
+
+        var status = tc.querySelector('.tool-call-status');
+        status.className = 'tool-call-status done';
+        status.textContent = 'done';
+
         scrollToBottom();
     }
-    window.showToolResult = showToolResult;
 
     function showToolError(name, errorMsg) {
-        if (!currentAssistantBubble) return;
-        const indicators = currentAssistantBubble.querySelectorAll(
-            '.tool-indicator[data-tool-name="' + CSS.escape(name) + '"]'
-        );
-        const indicator = indicators.length > 0 ? indicators[indicators.length - 1] : null;
-        if (indicator) {
-            const icon = indicator.querySelector('.tool-icon');
-            icon.className = 'tool-icon error';
-            while (icon.firstChild) icon.removeChild(icon.firstChild);
-            const errIcon = document.createElement('i');
-            errIcon.className = 'fas fa-times-circle';
-            icon.appendChild(errIcon);
+        if (!currentAssistantMsg) return;
+        var tools = currentAssistantMsg.querySelectorAll('.tool-call[data-tool-name="' + CSS.escape(name) + '"]');
+        var tc = tools.length > 0 ? tools[tools.length - 1] : null;
+        if (!tc) return;
 
-            const paramsEl = indicator.querySelector('.tool-params');
-            if (paramsEl) {
-                paramsEl.className = 'tool-summary';
-                paramsEl.style.color = '#e08080';
-                paramsEl.textContent = errorMsg || 'Error';
-            }
-        }
-        scrollToBottom();
+        var icon = tc.querySelector('.tool-call-icon');
+        icon.className = 'tool-call-icon error';
+        icon.innerHTML = '<i class="fas fa-times"></i>';
+
+        var status = tc.querySelector('.tool-call-status');
+        status.className = 'tool-call-status error';
+        status.textContent = 'error';
+
+        var detail = tc.querySelector('.tool-call-detail');
+        if (detail) detail.textContent = errorMsg || 'Error';
     }
 
     function setInputEnabled(enabled) {
@@ -431,62 +660,62 @@
         if (chatInput) chatInput.disabled = !enabled;
     }
 
+    function useSuggestion(el) {
+        if (chatInput) {
+            chatInput.value = el.textContent;
+            chatInput.focus();
+        }
+    }
+    window.useSuggestion = useSuggestion;
+
     async function newSession() {
         try {
-            const resp = await fetch('/chat/new', { method: 'POST' });
-            const data = await resp.json();
+            var resp = await fetch('/chat/new', { method: 'POST' });
+            var data = await resp.json();
             if (data.session_id) {
                 sessionId = data.session_id;
-                // Clear chat
-                if (chatMessages) {
-                    while (chatMessages.firstChild) {
-                        chatMessages.removeChild(chatMessages.firstChild);
-                    }
-                    const emptyDiv = document.createElement('div');
-                    emptyDiv.className = 'empty-state';
-                    emptyDiv.id = 'emptyState';
-
-                    const emptyIcon = document.createElement('span');
-                    emptyIcon.className = 'empty-icon';
-                    const brainIcon = document.createElement('i');
-                    brainIcon.className = 'fas fa-brain';
-                    emptyIcon.appendChild(brainIcon);
-                    emptyDiv.appendChild(emptyIcon);
-
-                    const emptyP = document.createElement('p');
-                    emptyP.textContent = 'Start a conversation with BrainNet to analyze your neuroimaging data, compare strategies, or explore results.';
-                    emptyDiv.appendChild(emptyP);
-
-                    chatMessages.appendChild(emptyDiv);
+                if (sessionIndicator) sessionIndicator.textContent = sessionId.substring(0, 8);
+                if (chatInner) {
+                    chatInner.innerHTML = '';
+                    var empty = document.createElement('div');
+                    empty.className = 'chat-empty';
+                    empty.id = 'emptyState';
+                    empty.innerHTML = '<div class="chat-empty-orb"><i class="fas fa-brain"></i></div>' +
+                        '<h3>BrainNet Analysis Orchestrator</h3>' +
+                        '<p>Describe your analysis goal and I\'ll design multi-strategy workflows, execute them, and compare results.</p>' +
+                        '<div class="chat-suggestions">' +
+                        '<div class="chat-suggestion" onclick="useSuggestion(this)">Analyze resting-state connectivity for sub-01</div>' +
+                        '<div class="chat-suggestion" onclick="useSuggestion(this)">Compare static vs dynamic approaches</div>' +
+                        '<div class="chat-suggestion" onclick="useSuggestion(this)">Run QC and preprocess ds000228</div>' +
+                        '</div>';
+                    chatInner.appendChild(empty);
                 }
-                currentAssistantBubble = null;
-            } else if (data.error) {
-                alert('Error: ' + data.error);
+                currentAssistantMsg = null;
             }
         } catch (err) {
-            alert('Failed to create session: ' + err.message);
+            console.error('Failed to create session:', err);
         }
     }
     window.newSession = newSession;
 
     async function sendMessage() {
         if (isSending) return;
-        const text = chatInput ? chatInput.value.trim() : '';
+        var text = chatInput ? chatInput.value.trim() : '';
         if (!text) return;
 
-        // Create session if needed
         if (!sessionId) {
             try {
-                const resp = await fetch('/chat/new', { method: 'POST' });
-                const data = await resp.json();
+                var resp = await fetch('/chat/new', { method: 'POST' });
+                var data = await resp.json();
                 if (data.session_id) {
                     sessionId = data.session_id;
+                    if (sessionIndicator) sessionIndicator.textContent = sessionId.substring(0, 8);
                 } else {
-                    alert('Error creating session: ' + (data.error || 'Unknown error'));
+                    appendText('Error creating session.');
                     return;
                 }
             } catch (err) {
-                alert('Failed to create session: ' + err.message);
+                appendText('Connection error.');
                 return;
             }
         }
@@ -495,48 +724,45 @@
         chatInput.style.height = 'auto';
         addUserMessage(text);
         setInputEnabled(false);
-        currentAssistantBubble = null;
-        createAssistantBubble();
+        currentAssistantMsg = null;
+        createAssistantMessage();
 
         try {
-            const resp = await fetch('/chat/send', {
+            var resp = await fetch('/chat/send', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ session_id: sessionId, message: text })
             });
 
             if (!resp.ok) {
-                const errData = await resp.json().catch(function() { return {}; });
+                var errData = await resp.json().catch(function() { return {}; });
                 appendText('Error: ' + (errData.error || resp.statusText));
                 setInputEnabled(true);
                 return;
             }
 
-            const reader = resp.body.getReader();
-            const decoder = new TextDecoder();
-            let buffer = '';
+            var reader = resp.body.getReader();
+            var decoder = new TextDecoder();
+            var buffer = '';
 
             while (true) {
-                const result = await reader.read();
+                var result = await reader.read();
                 if (result.done) break;
 
                 buffer += decoder.decode(result.value, { stream: true });
-                const lines = buffer.split('\n');
+                var lines = buffer.split('\n');
                 buffer = lines.pop() || '';
 
-                let eventType = null;
-                for (let i = 0; i < lines.length; i++) {
-                    const line = lines[i];
+                var eventType = null;
+                for (var i = 0; i < lines.length; i++) {
+                    var line = lines[i];
                     if (line.startsWith('event: ')) {
                         eventType = line.substring(7).trim();
                     } else if (line.startsWith('data: ')) {
-                        const dataStr = line.substring(6);
                         try {
-                            const data = JSON.parse(dataStr);
-                            handleSSEEvent(eventType, data);
-                        } catch (e) {
-                            // Not valid JSON, skip
-                        }
+                            var d = JSON.parse(line.substring(6));
+                            handleSSEEvent(eventType, d);
+                        } catch (e) {}
                         eventType = null;
                     }
                 }
@@ -559,26 +785,23 @@
                 showToolStart(data.name || data.tool || 'tool', data.params || data.input || {});
                 break;
             case 'tool_result':
-                var rawSummary = data.summary || data.result || '';
-                var summaryText = typeof rawSummary === 'object' ? JSON.stringify(rawSummary) : String(rawSummary);
-                showToolResult(data.name || data.tool || 'tool', summaryText);
+                var raw = data.summary || data.result || '';
+                var txt = typeof raw === 'object' ? JSON.stringify(raw) : String(raw);
+                showToolResult(data.name || data.tool || 'tool', txt);
                 break;
             case 'error':
                 appendText('\n[Error: ' + (data.message || data.error || 'Unknown error') + ']');
                 break;
             case 'done':
-                // Stream complete
                 break;
             default:
-                if (data.text) {
-                    appendText(data.text);
-                }
+                if (data.text) appendText(data.text);
                 break;
         }
     }
 
-    // Initialize session on page load
-    if (!document.querySelector('.api-error-box')) {
+    // Initialize
+    if (!document.querySelector('.chat-api-error')) {
         newSession();
     }
 })();

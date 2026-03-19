@@ -1,45 +1,151 @@
 {% extends "base.html" %}
+{% block title %}Analysis - BrainNet{% endblock %}
 
-{% block title %}Analysis Results - BrainNet MRI Data Management{% endblock %}
+{% block head %}
+<style>
+    .analysis-card {
+        position: relative;
+        overflow: hidden;
+    }
+    .analysis-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 2px;
+        background: linear-gradient(90deg, var(--accent-cyan), var(--accent-blue), var(--accent-violet));
+        opacity: 0;
+        transition: opacity var(--transition-default);
+    }
+    .analysis-card:hover::before { opacity: 1; }
+
+    .chart-container {
+        position: relative;
+        background: var(--bg-deep);
+        border: 1px solid var(--border-subtle);
+        border-radius: var(--radius-sm);
+        padding: 20px;
+        margin-top: 16px;
+    }
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-    <h1 class="h2">Analysis Results</h1>
-</div>
+<div class="page-container">
+    <div class="page-header">
+        <div>
+            <h1><i class="fas fa-chart-line"></i>Analysis</h1>
+            <p class="page-subtitle">Static and dynamic connectivity analysis results</p>
+        </div>
+        <a href="/chat" class="btn btn-primary">
+            <i class="fas fa-comments"></i> Run via Chat
+        </a>
+    </div>
 
-<div class="row">
-    <div class="col-md-12">
-        <div class="card mb-4">
+    <div class="grid grid-2 mb-lg">
+        <div class="card analysis-card">
             <div class="card-body">
-                <h5 class="card-title">Static/ Dynamic Analysis</h5>
-                <div id="analysis-charts">
-                    <!-- Example placeholder for charts -->
-                    <canvas id="resultChart" height="120"></canvas>
+                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 14px;">
+                    <div style="width: 36px; height: 36px; border-radius: 10px; background: var(--accent-cyan-glow); display: flex; align-items: center; justify-content: center;">
+                        <i class="fas fa-project-diagram" style="color: var(--accent-cyan);"></i>
+                    </div>
+                    <div>
+                        <div class="card-title" style="margin-bottom: 0;">Static Connectivity</div>
+                        <div style="font-size: 0.78rem; color: var(--text-tertiary);">Pearson correlation matrices</div>
+                    </div>
                 </div>
-                <p class="mt-3">Analysis results and visualizations will be shown here.</p>
+                <div class="chart-container">
+                    <canvas id="staticChart" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="card analysis-card">
+            <div class="card-body">
+                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 14px;">
+                    <div style="width: 36px; height: 36px; border-radius: 10px; background: rgba(74, 142, 255, 0.1); display: flex; align-items: center; justify-content: center;">
+                        <i class="fas fa-wave-square" style="color: var(--accent-blue);"></i>
+                    </div>
+                    <div>
+                        <div class="card-title" style="margin-bottom: 0;">Dynamic Analysis</div>
+                        <div style="font-size: 0.78rem; color: var(--text-tertiary);">Temporal state transitions</div>
+                    </div>
+                </div>
+                <div class="chart-container">
+                    <canvas id="dynamicChart" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-body" style="text-align: center; padding: 40px;">
+            <p style="color: var(--text-tertiary); font-size: 0.9rem; margin-bottom: 16px;">
+                Run an analysis through the AI orchestrator to see results here, or upload patient data for automated processing.
+            </p>
+            <div style="display: flex; gap: 10px; justify-content: center;">
+                <a href="/chat" class="btn btn-primary"><i class="fas fa-comments"></i> Start Analysis Chat</a>
+                <a href="{{ url_for('patients') }}" class="btn btn-ghost"><i class="fas fa-users"></i> View Subjects</a>
             </div>
         </div>
     </div>
 </div>
+{% endblock %}
 
+{% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-// Example chart.js usage
-const ctx = document.getElementById('resultChart').getContext('2d');
-const resultChart = new Chart(ctx, {
+Chart.defaults.color = '#5a6378';
+Chart.defaults.borderColor = 'rgba(100, 180, 220, 0.06)';
+Chart.defaults.font.family = "'DM Sans', sans-serif";
+
+var staticCtx = document.getElementById('staticChart').getContext('2d');
+new Chart(staticCtx, {
     type: 'bar',
     data: {
-        labels: ['Feature 1', 'Feature 2', 'Feature 3'],
+        labels: ['Degree', 'Clustering', 'Efficiency', 'Modularity', 'Betweenness'],
         datasets: [{
-            label: 'Value',
-            data: [12, 19, 3],
-            backgroundColor: 'rgba(54, 162, 235, 0.5)'
+            label: 'Metric Value',
+            data: [0.42, 0.38, 0.71, 0.55, 0.29],
+            backgroundColor: 'rgba(56, 217, 197, 0.3)',
+            borderColor: 'rgba(56, 217, 197, 0.6)',
+            borderWidth: 1,
+            borderRadius: 4
         }]
     },
     options: {
         responsive: true,
-        plugins: {
-            legend: { display: false }
+        plugins: { legend: { display: false } },
+        scales: {
+            y: { beginAtZero: true, grid: { color: 'rgba(100, 180, 220, 0.04)' } },
+            x: { grid: { display: false } }
+        }
+    }
+});
+
+var dynCtx = document.getElementById('dynamicChart').getContext('2d');
+new Chart(dynCtx, {
+    type: 'line',
+    data: {
+        labels: Array.from({length: 20}, function(_, i) { return 'T' + (i+1); }),
+        datasets: [{
+            label: 'State Transitions',
+            data: [1,1,2,2,2,3,3,1,1,2,3,3,3,2,1,1,1,2,2,3],
+            borderColor: 'rgba(74, 142, 255, 0.8)',
+            backgroundColor: 'rgba(74, 142, 255, 0.1)',
+            fill: true,
+            tension: 0.4,
+            pointRadius: 3,
+            pointBackgroundColor: 'rgba(74, 142, 255, 0.8)'
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: {
+            y: { grid: { color: 'rgba(100, 180, 220, 0.04)' }, ticks: { stepSize: 1 } },
+            x: { grid: { display: false } }
         }
     }
 });

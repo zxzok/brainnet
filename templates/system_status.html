@@ -1,67 +1,80 @@
 {% extends "base.html" %}
-
 {% block title %}System Status - BrainNet{% endblock %}
 
 {% block content %}
-<div class="pt-3 pb-2 mb-3 border-bottom">
-    <h1 class="h2"><i class="fas fa-cogs"></i> System Status</h1>
-</div>
-
-{% if analysis_error %}
-<div class="alert alert-warning">
-    <h5><i class="fas fa-exclamation-triangle"></i> Analysis Pipeline Unavailable</h5>
-    <p class="mb-1">The analysis pipeline cannot run because of missing dependencies:</p>
-    <code>{{ analysis_error }}</code>
-    <hr>
-    <p class="mb-0">Install with: <code>pip install numpy scipy pandas nibabel scikit-learn networkx</code></p>
-</div>
-{% else %}
-<div class="alert alert-success">
-    <i class="fas fa-check-circle"></i> Analysis pipeline is ready.
-</div>
-{% endif %}
-
-<div class="card">
-    <div class="card-header"><h5 class="mb-0">Python Dependencies</h5></div>
-    <div class="card-body p-0">
-        <table class="table table-striped mb-0">
-            <thead>
-                <tr><th>Package</th><th>Status</th><th>Required For</th></tr>
-            </thead>
-            <tbody>
-                {% set pkg_info = {
-                    'numpy': 'Core numerical computation',
-                    'scipy': 'Smoothing, temporal filtering',
-                    'pandas': 'Confound handling',
-                    'nibabel': 'Loading NIfTI MRI files',
-                    'nilearn': 'Built-in atlas templates (AAL, Harvard-Oxford)',
-                    'sklearn': 'K-means clustering (dynamic states)',
-                    'networkx': 'Graph metrics (degree, modularity, efficiency)',
-                    'plotly': 'Interactive report generation',
-                    'hmmlearn': 'Hidden Markov Model analysis (optional)'
-                } %}
-                {% for pkg, version in deps.items() %}
-                <tr>
-                    <td><strong>{{ pkg }}</strong></td>
-                    <td>
-                        {% if version %}
-                        <span class="badge bg-success"><i class="fas fa-check"></i> {{ version }}</span>
-                        {% else %}
-                        <span class="badge bg-danger"><i class="fas fa-times"></i> Not installed</span>
-                        {% endif %}
-                    </td>
-                    <td class="text-muted small">{{ pkg_info.get(pkg, '') }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+<div class="page-container">
+    <div class="page-header">
+        <div>
+            <h1><i class="fas fa-cog"></i>System Status</h1>
+            <p class="page-subtitle">Dependency status and pipeline readiness</p>
+        </div>
     </div>
-</div>
 
-<div class="card mt-4">
-    <div class="card-header"><h5 class="mb-0">Install All Required Dependencies</h5></div>
-    <div class="card-body">
-        <pre class="bg-dark text-light p-3 rounded mb-0"><code>pip install numpy scipy pandas nibabel nilearn scikit-learn networkx plotly</code></pre>
+    {% if analysis_error %}
+    <div class="alert alert-warning mb-lg">
+        <i class="fas fa-exclamation-triangle"></i>
+        <div>
+            <strong>Analysis Pipeline Unavailable</strong>
+            <p style="margin: 6px 0 0; opacity: 0.85;">Missing dependencies: <code>{{ analysis_error }}</code></p>
+        </div>
+    </div>
+    {% else %}
+    <div class="alert alert-success mb-lg">
+        <i class="fas fa-check-circle"></i>
+        <div><strong>Analysis pipeline is ready.</strong> All required dependencies installed.</div>
+    </div>
+    {% endif %}
+
+    <div class="card mb-lg">
+        <div class="card-header">
+            <h5>Python Dependencies</h5>
+        </div>
+        <div style="padding: 0;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Package</th>
+                        <th>Status</th>
+                        <th>Required For</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% set pkg_info = {
+                        'numpy': 'Core numerical computation',
+                        'scipy': 'Smoothing, temporal filtering',
+                        'pandas': 'Confound handling',
+                        'nibabel': 'Loading NIfTI MRI files',
+                        'nilearn': 'Built-in atlas templates (AAL, Harvard-Oxford)',
+                        'sklearn': 'K-means clustering (dynamic states)',
+                        'networkx': 'Graph metrics (degree, modularity, efficiency)',
+                        'plotly': 'Interactive report generation',
+                        'hmmlearn': 'Hidden Markov Model analysis (optional)'
+                    } %}
+                    {% for pkg, version in deps.items() %}
+                    <tr>
+                        <td><strong>{{ pkg }}</strong></td>
+                        <td>
+                            {% if version %}
+                            <span class="badge badge-emerald"><i class="fas fa-check" style="font-size: 0.6rem;"></i> {{ version }}</span>
+                            {% else %}
+                            <span class="badge badge-rose"><i class="fas fa-times" style="font-size: 0.6rem;"></i> Missing</span>
+                            {% endif %}
+                        </td>
+                        <td style="color: var(--text-tertiary); font-size: 0.82rem;">{{ pkg_info.get(pkg, '') }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h5>Install All Required Dependencies</h5>
+        </div>
+        <div class="card-body">
+            <pre><code>pip install numpy scipy pandas nibabel nilearn scikit-learn networkx plotly</code></pre>
+        </div>
     </div>
 </div>
 {% endblock %}

@@ -1,3 +1,4 @@
+.DS_Store
 __pycache__/
 *.pyc
 *.pyo
@@ -5,4 +6,16 @@ __pycache__/
 dist/
 build/
 *.db
+*.sqlite
+*.sqlite3
 .pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+instance/
+uploads/
+reports/
+openneuro_datasets/
+.worktrees/

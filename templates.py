@@ -12,9 +12,12 @@ These utilities rely on :mod:`nilearn` to provide atlas data.  If
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, Sequence, Optional, Union
+from typing import TYPE_CHECKING, Dict, Sequence, Optional, Union
 
 import numpy as np
+
+if TYPE_CHECKING:
+    from .preprocessing import PreprocessedData
 
 try:  # nilearn and nibabel are optional dependencies
     from nilearn import datasets

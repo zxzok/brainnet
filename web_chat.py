@@ -14,15 +14,32 @@ _session_manager = SessionManager(max_sessions=10, timeout_seconds=1800)
 
 
 def _check_api_key() -> str | None:
-    """Return an error message if ANTHROPIC_API_KEY is not set."""
+    """Return an error message if no Anthropic API key is configured."""
     import os
 
-    if not os.environ.get("ANTHROPIC_API_KEY"):
-        return (
-            "ANTHROPIC_API_KEY is not set. "
-            "Set this environment variable to enable the chat feature."
-        )
-    return None
+    # Check environment first, then DB settings
+    if os.environ.get("ANTHROPIC_API_KEY"):
+        return None
+    try:
+        from flask import current_app
+        from brainnet.runtime import connect_db
+    except ImportError:
+        from runtime import connect_db
+    try:
+        conn = connect_db()
+        cur = conn.cursor()
+        cur.execute("SELECT value FROM user_settings WHERE key = 'anthropic_api_key'")
+        row = cur.fetchone()
+        conn.close()
+        if row and row[0]:
+            os.environ["ANTHROPIC_API_KEY"] = row[0]
+            return None
+    except Exception:
+        pass
+    return (
+        "未配置 Claude API 密钥。"
+        "请在设置页面配置您的 Anthropic API 密钥。"
+    )
 
 
 @chat_bp.route("/chat")

@@ -1,32 +1,39 @@
 {% extends "base.html" %}
-{% block title %}Dashboard - BrainNet{% endblock %}
+{% block title %}控制台 - BrainNet{% endblock %}
 
 {% block content %}
 <div class="page-container">
-    <!-- Hero Stats Row -->
+    <!-- 统计卡片 -->
     <div class="grid grid-4 mb-lg">
         <div class="stat-card">
-            <div class="stat-label">Subjects</div>
+            <div class="stat-label">被试数量</div>
             <div class="stat-value cyan">{{ patients|length }}</div>
         </div>
         <div class="stat-card">
-            <div class="stat-label">Datasets</div>
-            <div class="stat-value blue">--</div>
+            <div class="stat-label">数据集</div>
+            <div class="stat-value blue">{{ dataset_count }}</div>
         </div>
         <div class="stat-card">
-            <div class="stat-label">Analyses Run</div>
-            <div class="stat-value violet">--</div>
+            <div class="stat-label">已完成分析</div>
+            <div class="stat-value violet">{{ analysis_count }}</div>
         </div>
         <div class="stat-card">
-            <div class="stat-label">System</div>
+            <div class="stat-label">AI 状态</div>
+            {% if has_api_key %}
             <div class="stat-value emerald" style="color: var(--accent-emerald); font-size: 1.1rem; margin-top: 8px;">
-                <i class="fas fa-circle" style="font-size: 8px; vertical-align: middle; margin-right: 6px;"></i>Ready
+                <i class="fas fa-circle" style="font-size: 8px; vertical-align: middle; margin-right: 6px;"></i>就绪
             </div>
+            {% else %}
+            <div class="stat-value" style="color: var(--accent-rose); font-size: 0.9rem; margin-top: 8px;">
+                <i class="fas fa-exclamation-triangle" style="font-size: 10px; margin-right: 6px;"></i>
+                <a href="{{ url_for('settings') }}" style="color: var(--accent-rose);">需配置密钥</a>
+            </div>
+            {% endif %}
         </div>
     </div>
 
     <div class="grid" style="grid-template-columns: 1fr 1fr; gap: 20px;">
-        <!-- Welcome / Quick Actions -->
+        <!-- 快速操作 -->
         <div class="card">
             <div class="card-body" style="padding: 28px;">
                 <div style="display: flex; align-items: flex-start; gap: 16px; margin-bottom: 20px;">
@@ -34,36 +41,36 @@
                         <i class="fas fa-brain" style="color: var(--accent-cyan); font-size: 1.1rem;"></i>
                     </div>
                     <div>
-                        <h3 style="font-size: 1.1rem; font-weight: 600; letter-spacing: -0.02em; margin-bottom: 6px;">fMRI Brain Network Analysis</h3>
+                        <h3 style="font-size: 1.1rem; font-weight: 600; letter-spacing: -0.02em; margin-bottom: 6px;">fMRI 脑网络分析</h3>
                         <p style="font-size: 0.85rem; color: var(--text-tertiary); line-height: 1.5;">
-                            Multi-strategy connectivity analysis with automated comparison. Load data, run static and dynamic pipelines, and let the AI orchestrator compare approaches.
+                            多策略连接性分析与自动比较。加载数据，运行静态和动态分析流水线，让 AI 编排器比较各种分析方案。
                         </p>
                     </div>
                 </div>
 
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                     <a href="/chat" class="btn btn-primary" style="justify-content: center;">
-                        <i class="fas fa-comments"></i> Analysis Chat
+                        <i class="fas fa-comments"></i> AI 对话分析
                     </a>
                     <a href="{{ url_for('patients') }}" class="btn btn-ghost" style="justify-content: center;">
-                        <i class="fas fa-users"></i> View Subjects
+                        <i class="fas fa-users"></i> 被试管理
                     </a>
                     <a href="{{ url_for('data_hub') }}" class="btn btn-ghost" style="justify-content: center;">
-                        <i class="fas fa-database"></i> Data Hub
+                        <i class="fas fa-database"></i> 数据中心
                     </a>
                     <a href="{{ url_for('analysis') }}" class="btn btn-ghost" style="justify-content: center;">
-                        <i class="fas fa-chart-line"></i> Analysis
+                        <i class="fas fa-chart-line"></i> 分析结果
                     </a>
                 </div>
             </div>
         </div>
 
-        <!-- Recent Subjects -->
+        <!-- 最近被试 -->
         <div class="card">
             <div class="card-header flex items-center justify-between">
-                <h5>Recent Subjects</h5>
+                <h5>最近被试</h5>
                 <a href="{{ url_for('add_patient') }}" class="btn btn-sm btn-ghost">
-                    <i class="fas fa-plus"></i> Add
+                    <i class="fas fa-plus"></i> 添加
                 </a>
             </div>
             {% if patients %}
@@ -91,42 +98,42 @@
             {% else %}
             <div class="empty-state" style="padding: 40px 20px;">
                 <div class="empty-state-icon"><i class="fas fa-users"></i></div>
-                <p>No subjects yet. Add your first subject to begin analysis.</p>
-                <a href="{{ url_for('add_patient') }}" class="btn btn-primary btn-sm"><i class="fas fa-plus"></i> Add Subject</a>
+                <p>暂无被试数据。添加第一个被试以开始分析。</p>
+                <a href="{{ url_for('add_patient') }}" class="btn btn-primary btn-sm"><i class="fas fa-plus"></i> 添加被试</a>
             </div>
             {% endif %}
         </div>
     </div>
 
-    <!-- Capabilities -->
+    <!-- 功能模块 -->
     <div class="mt-lg">
-        <h3 style="font-size: 0.78rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-tertiary); margin-bottom: 14px;">Analysis Capabilities</h3>
+        <h3 style="font-size: 0.78rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-tertiary); margin-bottom: 14px;">分析能力</h3>
         <div class="grid grid-3">
             <div class="card" style="border-color: rgba(56, 217, 197, 0.08);">
                 <div class="card-body">
                     <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
                         <i class="fas fa-project-diagram" style="color: var(--accent-cyan); font-size: 0.9rem;"></i>
-                        <span style="font-weight: 600; font-size: 0.9rem;">Static Connectivity</span>
+                        <span style="font-weight: 600; font-size: 0.9rem;">静态连接性</span>
                     </div>
-                    <p class="card-text" style="font-size: 0.82rem; line-height: 1.5;">Pearson correlation, partial correlation, and tangent space connectivity matrices with graph-theoretic metrics.</p>
+                    <p class="card-text" style="font-size: 0.82rem; line-height: 1.5;">Pearson 相关、偏相关和切空间连接矩阵，配合图论指标。</p>
                 </div>
             </div>
             <div class="card" style="border-color: rgba(74, 142, 255, 0.08);">
                 <div class="card-body">
                     <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
                         <i class="fas fa-wave-square" style="color: var(--accent-blue); font-size: 0.9rem;"></i>
-                        <span style="font-weight: 600; font-size: 0.9rem;">Dynamic Analysis</span>
+                        <span style="font-weight: 600; font-size: 0.9rem;">动态分析</span>
                     </div>
-                    <p class="card-text" style="font-size: 0.82rem; line-height: 1.5;">Sliding-window connectivity with k-means state clustering, HMM state inference, switching rates, and dwell times.</p>
+                    <p class="card-text" style="font-size: 0.82rem; line-height: 1.5;">滑动窗口连接性，K-means 状态聚类、HMM 推断、状态驻留和转换。</p>
                 </div>
             </div>
             <div class="card" style="border-color: rgba(155, 109, 255, 0.08);">
                 <div class="card-body">
                     <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
                         <i class="fas fa-robot" style="color: var(--accent-violet); font-size: 0.9rem;"></i>
-                        <span style="font-weight: 600; font-size: 0.9rem;">AI Orchestrator</span>
+                        <span style="font-weight: 600; font-size: 0.9rem;">AI 编排器</span>
                     </div>
-                    <p class="card-text" style="font-size: 0.82rem; line-height: 1.5;">Claude-powered multi-strategy comparison. Describe your goal, get automated pipeline design and cross-strategy ranking.</p>
+                    <p class="card-text" style="font-size: 0.82rem; line-height: 1.5;">Claude 驱动的多策略比较。描述目标，获取自动流水线设计和策略排名。</p>
                 </div>
             </div>
         </div>

@@ -1,0 +1,77 @@
+version: 1
+mode: sequential-single-task
+source_docs:
+  - docs/IMPLEMENTATION_GAP_AUDIT.md
+  - docs/DEVELOPMENT_TASK_PROMPTS.md
+rules:
+  - one_agent_one_task
+  - strict_sequential_order
+  - handoff_required_before_next_agent
+  - minimal_safe_change_only
+  - do_not_implement_future_tasks_early
+agents:
+  - order: 1
+    agent_id: workflow_runtime_agent
+    task_id: TASK-001
+    prompt_file: agents/prompts/01_task_001_workflow_runtime_agent.md
+    handoff_to: method_registry_agent
+  - order: 2
+    agent_id: method_registry_agent
+    task_id: TASK-002
+    prompt_file: agents/prompts/02_task_002_method_registry_agent.md
+    handoff_to: test_foundation_agent
+  - order: 3
+    agent_id: test_foundation_agent
+    task_id: TASK-013
+    prompt_file: agents/prompts/03_task_013_test_foundation_agent.md
+    handoff_to: web_analysis_features_agent
+  - order: 4
+    agent_id: web_analysis_features_agent
+    task_id: TASK-008
+    prompt_file: agents/prompts/04_task_008_web_analysis_features_agent.md
+    handoff_to: visualization_data_agent
+  - order: 5
+    agent_id: visualization_data_agent
+    task_id: TASK-009
+    prompt_file: agents/prompts/05_task_009_visualization_data_agent.md
+    handoff_to: preprocessing_hardening_agent
+  - order: 6
+    agent_id: preprocessing_hardening_agent
+    task_id: TASK-006
+    prompt_file: agents/prompts/06_task_006_preprocessing_hardening_agent.md
+    handoff_to: template_roi_agent
+  - order: 7
+    agent_id: template_roi_agent
+    task_id: TASK-007
+    prompt_file: agents/prompts/07_task_007_template_roi_agent.md
+    handoff_to: exploration_decision_agent
+  - order: 8
+    agent_id: exploration_decision_agent
+    task_id: TASK-003
+    prompt_file: agents/prompts/08_task_003_exploration_decision_agent.md
+    handoff_to: statistical_analysis_agent
+  - order: 9
+    agent_id: statistical_analysis_agent
+    task_id: TASK-004
+    prompt_file: agents/prompts/09_task_004_statistical_analysis_agent.md
+    handoff_to: machine_learning_agent
+  - order: 10
+    agent_id: machine_learning_agent
+    task_id: TASK-005
+    prompt_file: agents/prompts/10_task_005_machine_learning_agent.md
+    handoff_to: reporting_llm_agent
+  - order: 11
+    agent_id: reporting_llm_agent
+    task_id: TASK-010
+    prompt_file: agents/prompts/11_task_010_reporting_llm_agent.md
+    handoff_to: openneuro_reliability_agent
+  - order: 12
+    agent_id: openneuro_reliability_agent
+    task_id: TASK-011
+    prompt_file: agents/prompts/12_task_011_openneuro_reliability_agent.md
+    handoff_to: multimodal_integration_agent
+  - order: 13
+    agent_id: multimodal_integration_agent
+    task_id: TASK-012
+    prompt_file: agents/prompts/13_task_012_multimodal_integration_agent.md
+    handoff_to: null

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Analysis Chat - BrainNet{% endblock %}
+{% block title %}AI 分析对话 - BrainNet{% endblock %}
 
 {% block head %}
 <style>
@@ -453,11 +453,11 @@
     <aside class="chat-sidebar">
         <div class="chat-sidebar-header">
             <button class="btn-new-chat" onclick="newSession()">
-                <i class="fas fa-plus"></i> New Analysis
+                <i class="fas fa-plus"></i> 新建分析
             </button>
         </div>
         <div class="chat-sidebar-tools">
-            <div class="sidebar-section-label">Available Tools</div>
+            <div class="sidebar-section-label">可用工具</div>
             <ul class="tool-list">
                 <li class="tool-item"><i class="fas fa-download" style="color: var(--accent-cyan);"></i> load_dataset</li>
                 <li class="tool-item"><i class="fas fa-list" style="color: var(--accent-cyan);"></i> list_subjects</li>
@@ -470,9 +470,9 @@
                 <li class="tool-item"><i class="fas fa-file-alt" style="color: var(--accent-emerald);"></i> generate_report</li>
             </ul>
 
-            <div class="sidebar-section-label">Session</div>
+            <div class="sidebar-section-label">会话</div>
             <div style="padding: 4px 10px;">
-                <div style="font-family: var(--mono); font-size: 0.72rem; color: var(--text-ghost);" id="sessionIndicator">No active session</div>
+                <div style="font-family: var(--mono); font-size: 0.72rem; color: var(--text-ghost);" id="sessionIndicator">无活跃会话</div>
             </div>
         </div>
     </aside>
@@ -482,7 +482,7 @@
         {% if api_error %}
         <div class="chat-api-error">
             <div class="error-icon"><i class="fas fa-exclamation-triangle"></i></div>
-            <h3>API Not Configured</h3>
+            <h3>API 未配置</h3>
             <p>{{ api_error }}</p>
         </div>
         {% else %}
@@ -490,12 +490,12 @@
             <div class="chat-messages-inner" id="chatMessagesInner">
                 <div class="chat-empty" id="emptyState">
                     <div class="chat-empty-orb"><i class="fas fa-brain"></i></div>
-                    <h3>BrainNet Analysis Orchestrator</h3>
-                    <p>Describe your analysis goal and I'll design multi-strategy workflows, execute them, and compare results across approaches.</p>
+                    <h3>BrainNet 分析编排器</h3>
+                    <p>描述您的分析目标，我将设计多策略工作流、执行分析并比较不同方法的结果。</p>
                     <div class="chat-suggestions">
-                        <div class="chat-suggestion" onclick="useSuggestion(this)">Analyze resting-state connectivity for sub-01</div>
-                        <div class="chat-suggestion" onclick="useSuggestion(this)">Compare static vs dynamic approaches</div>
-                        <div class="chat-suggestion" onclick="useSuggestion(this)">Run QC and preprocess ds000228</div>
+                        <div class="chat-suggestion" onclick="useSuggestion(this)">分析 sub-01 的静息态连接性</div>
+                        <div class="chat-suggestion" onclick="useSuggestion(this)">比较静态与动态分析方法</div>
+                        <div class="chat-suggestion" onclick="useSuggestion(this)">对 ds000228 运行质控和预处理</div>
                     </div>
                 </div>
             </div>
@@ -504,14 +504,14 @@
         <div class="chat-input-container">
             <div class="chat-input-inner">
                 <div class="chat-input-wrap">
-                    <textarea id="chatInput" rows="1" placeholder="Describe your analysis goal..."
+                    <textarea id="chatInput" rows="1" placeholder="描述您的分析目标..."
                               onkeydown="handleKeyDown(event)"></textarea>
                 </div>
-                <button class="btn-send" id="btnSend" onclick="sendMessage()" title="Send message">
+                <button class="btn-send" id="btnSend" onclick="sendMessage()" title="发送消息">
                     <i class="fas fa-arrow-up"></i>
                 </button>
             </div>
-            <div class="input-hint">Press Enter to send, Shift+Enter for new line</div>
+            <div class="input-hint">按 Enter 发送，Shift+Enter 换行</div>
         </div>
         {% endif %}
     </main>
@@ -560,7 +560,7 @@
         var msg = document.createElement('div');
         msg.className = 'msg msg-user';
         msg.innerHTML = '<div class="msg-avatar"><i class="fas fa-user"></i></div>' +
-            '<div class="msg-body"><div class="msg-sender">You</div><div class="msg-content"></div></div>';
+            '<div class="msg-body"><div class="msg-sender">\u4f60</div><div class="msg-content"></div></div>';
         msg.querySelector('.msg-content').textContent = text;
         chatInner.appendChild(msg);
         scrollToBottom();
@@ -606,7 +606,7 @@
 
         var status = document.createElement('span');
         status.className = 'tool-call-status running';
-        status.textContent = 'running';
+        status.textContent = '\u8fd0\u884c\u4e2d';
 
         tc.appendChild(icon);
         tc.appendChild(nameEl);
@@ -627,11 +627,11 @@
         icon.innerHTML = '<i class="fas fa-check"></i>';
 
         var detail = tc.querySelector('.tool-call-detail');
-        if (detail) detail.textContent = summary || 'Complete';
+        if (detail) detail.textContent = summary || '\u5b8c\u6210';
 
         var status = tc.querySelector('.tool-call-status');
         status.className = 'tool-call-status done';
-        status.textContent = 'done';
+        status.textContent = '\u5b8c\u6210';
 
         scrollToBottom();
     }
@@ -648,10 +648,10 @@
 
         var status = tc.querySelector('.tool-call-status');
         status.className = 'tool-call-status error';
-        status.textContent = 'error';
+        status.textContent = '\u9519\u8bef';
 
         var detail = tc.querySelector('.tool-call-detail');
-        if (detail) detail.textContent = errorMsg || 'Error';
+        if (detail) detail.textContent = errorMsg || '\u9519\u8bef';
     }
 
     function setInputEnabled(enabled) {
@@ -681,12 +681,12 @@
                     empty.className = 'chat-empty';
                     empty.id = 'emptyState';
                     empty.innerHTML = '<div class="chat-empty-orb"><i class="fas fa-brain"></i></div>' +
-                        '<h3>BrainNet Analysis Orchestrator</h3>' +
-                        '<p>Describe your analysis goal and I\'ll design multi-strategy workflows, execute them, and compare results.</p>' +
+                        '<h3>BrainNet \u5206\u6790\u7f16\u6392\u5668</h3>' +
+                        '<p>\u63cf\u8ff0\u60a8\u7684\u5206\u6790\u76ee\u6807\uff0c\u6211\u5c06\u8bbe\u8ba1\u591a\u7b56\u7565\u5de5\u4f5c\u6d41\u3001\u6267\u884c\u5206\u6790\u5e76\u6bd4\u8f83\u4e0d\u540c\u65b9\u6cd5\u7684\u7ed3\u679c\u3002</p>' +
                         '<div class="chat-suggestions">' +
-                        '<div class="chat-suggestion" onclick="useSuggestion(this)">Analyze resting-state connectivity for sub-01</div>' +
-                        '<div class="chat-suggestion" onclick="useSuggestion(this)">Compare static vs dynamic approaches</div>' +
-                        '<div class="chat-suggestion" onclick="useSuggestion(this)">Run QC and preprocess ds000228</div>' +
+                        '<div class="chat-suggestion" onclick="useSuggestion(this)">\u5206\u6790 sub-01 \u7684\u9759\u606f\u6001\u8fde\u63a5\u6027</div>' +
+                        '<div class="chat-suggestion" onclick="useSuggestion(this)">\u6bd4\u8f83\u9759\u6001\u4e0e\u52a8\u6001\u5206\u6790\u65b9\u6cd5</div>' +
+                        '<div class="chat-suggestion" onclick="useSuggestion(this)">\u5bf9 ds000228 \u8fd0\u884c\u8d28\u63a7\u548c\u9884\u5904\u7406</div>' +
                         '</div>';
                     chatInner.appendChild(empty);
                 }
@@ -711,11 +711,11 @@
                     sessionId = data.session_id;
                     if (sessionIndicator) sessionIndicator.textContent = sessionId.substring(0, 8);
                 } else {
-                    appendText('Error creating session.');
+                    appendText('\u521b\u5efa\u4f1a\u8bdd\u5931\u8d25\u3002');
                     return;
                 }
             } catch (err) {
-                appendText('Connection error.');
+                appendText('\u8fde\u63a5\u9519\u8bef\u3002');
                 return;
             }
         }
@@ -736,7 +736,7 @@
 
             if (!resp.ok) {
                 var errData = await resp.json().catch(function() { return {}; });
-                appendText('Error: ' + (errData.error || resp.statusText));
+                appendText('\u9519\u8bef: ' + (errData.error || resp.statusText));
                 setInputEnabled(true);
                 return;
             }
@@ -768,7 +768,7 @@
                 }
             }
         } catch (err) {
-            appendText('\n[Connection error: ' + err.message + ']');
+            appendText('\n[\u8fde\u63a5\u9519\u8bef: ' + err.message + ']');
         } finally {
             setInputEnabled(true);
             if (chatInput) chatInput.focus();
@@ -790,7 +790,7 @@
                 showToolResult(data.name || data.tool || 'tool', txt);
                 break;
             case 'error':
-                appendText('\n[Error: ' + (data.message || data.error || 'Unknown error') + ']');
+                appendText('\n[\u9519\u8bef: ' + (data.message || data.error || '\u672a\u77e5\u9519\u8bef') + ']');
                 break;
             case 'done':
                 break;

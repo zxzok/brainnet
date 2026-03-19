@@ -1,118 +1,109 @@
 {% extends "base.html" %}
-
 {% block title %}{{ dataset.name }} - OpenNeuro - BrainNet{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-    <div>
-        <nav aria-label="breadcrumb">
-            <ol class="breadcrumb mb-1">
-                <li class="breadcrumb-item"><a href="{{ url_for('data_hub') }}">Data Hub</a></li>
-                <li class="breadcrumb-item"><a href="{{ url_for('openneuro') }}">OpenNeuro</a></li>
-                <li class="breadcrumb-item active">{{ dataset.id }}</li>
-            </ol>
-        </nav>
-        <h1 class="h2">{{ dataset.name or dataset.id }}</h1>
-    </div>
-</div>
-
-<div class="row">
-    <div class="col-md-8">
-        <div class="card mb-4">
-            <div class="card-header"><h5 class="mb-0">Dataset Information</h5></div>
-            <div class="card-body">
-                {% if dataset.description %}
-                <p>{{ dataset.description }}</p>
-                {% endif %}
-
-                <dl class="row mb-0">
-                    <dt class="col-sm-3">Dataset ID</dt>
-                    <dd class="col-sm-9">
-                        {{ dataset.id }}
-                        <a href="https://openneuro.org/datasets/{{ dataset.id }}" target="_blank" class="ms-2 small">
-                            <i class="fas fa-external-link-alt"></i> View on OpenNeuro
-                        </a>
-                    </dd>
-
-                    {% if dataset.modalities %}
-                    <dt class="col-sm-3">Modalities</dt>
-                    <dd class="col-sm-9">
-                        {% for mod in dataset.modalities %}
-                        <span class="badge bg-info">{{ mod }}</span>
-                        {% endfor %}
-                    </dd>
-                    {% endif %}
-
-                    {% if dataset.tasks %}
-                    <dt class="col-sm-3">Tasks</dt>
-                    <dd class="col-sm-9">
-                        {% for task in dataset.tasks %}
-                        <span class="badge bg-secondary">{{ task }}</span>
-                        {% endfor %}
-                    </dd>
-                    {% endif %}
-
-                    {% if dataset.subjects is not none %}
-                    <dt class="col-sm-3">Subjects</dt>
-                    <dd class="col-sm-9">{{ dataset.subjects }}</dd>
-                    {% endif %}
-
-                    {% if dataset.sessions is not none %}
-                    <dt class="col-sm-3">Sessions</dt>
-                    <dd class="col-sm-9">{{ dataset.sessions }}</dd>
-                    {% endif %}
-
-                    {% if dataset.total_files is not none %}
-                    <dt class="col-sm-3">Total Files</dt>
-                    <dd class="col-sm-9">{{ dataset.total_files }}</dd>
-                    {% endif %}
-
-                    {% if dataset.size is not none %}
-                    <dt class="col-sm-3">Size</dt>
-                    <dd class="col-sm-9">{{ "%.1f"|format(dataset.size / 1073741824) }} GB</dd>
-                    {% endif %}
-                </dl>
-            </div>
+<div class="page-container">
+    <div class="page-header">
+        <div>
+            <h1><i class="fas fa-database"></i>{{ dataset.name or dataset.id }}</h1>
+            <p class="page-subtitle">
+                <a href="{{ url_for('data_hub') }}" style="color: var(--text-tertiary);">数据中心</a>
+                <span style="color: var(--text-ghost); margin: 0 6px;">/</span>
+                <a href="{{ url_for('openneuro') }}" style="color: var(--text-tertiary);">OpenNeuro</a>
+                <span style="color: var(--text-ghost); margin: 0 6px;">/</span>
+                <span class="mono">{{ dataset.id }}</span>
+            </p>
         </div>
     </div>
 
-    <div class="col-md-4">
-        <div class="card mb-4">
-            <div class="card-header"><h5 class="mb-0">Actions</h5></div>
+    <div style="display: grid; grid-template-columns: 1fr 320px; gap: 20px;">
+        <!-- Main Info -->
+        <div class="card">
+            <div class="card-header"><h5>数据集信息</h5></div>
+            <div class="card-body">
+                {% if dataset.description %}
+                <p style="color: var(--text-secondary); margin-bottom: 20px; line-height: 1.6;">{{ dataset.description }}</p>
+                {% endif %}
+
+                <div style="display: grid; grid-template-columns: 120px 1fr; gap: 8px 16px; font-size: 0.88rem;">
+                    <span style="color: var(--text-tertiary);">数据集 ID</span>
+                    <span>
+                        <span class="mono" style="color: var(--accent-cyan);">{{ dataset.id }}</span>
+                        <a href="https://openneuro.org/datasets/{{ dataset.id }}" target="_blank" style="color: var(--text-ghost); margin-left: 8px; font-size: 0.78rem;">
+                            <i class="fas fa-external-link-alt"></i> OpenNeuro
+                        </a>
+                    </span>
+
+                    {% if dataset.modalities %}
+                    <span style="color: var(--text-tertiary);">模态</span>
+                    <span>{% for mod in dataset.modalities %}<span class="badge badge-blue">{{ mod }}</span> {% endfor %}</span>
+                    {% endif %}
+
+                    {% if dataset.tasks %}
+                    <span style="color: var(--text-tertiary);">任务</span>
+                    <span>{% for task in dataset.tasks %}<span class="badge badge-violet">{{ task }}</span> {% endfor %}</span>
+                    {% endif %}
+
+                    {% if dataset.subjects is not none %}
+                    <span style="color: var(--text-tertiary);">被试</span>
+                    <span class="mono">{{ dataset.subjects }}</span>
+                    {% endif %}
+
+                    {% if dataset.sessions is not none %}
+                    <span style="color: var(--text-tertiary);">会话</span>
+                    <span class="mono">{{ dataset.sessions }}</span>
+                    {% endif %}
+
+                    {% if dataset.total_files is not none %}
+                    <span style="color: var(--text-tertiary);">文件</span>
+                    <span class="mono">{{ dataset.total_files }}</span>
+                    {% endif %}
+
+                    {% if dataset.size is not none %}
+                    <span style="color: var(--text-tertiary);">大小</span>
+                    <span class="mono">{{ "%.1f"|format(dataset.size / 1073741824) }} GB</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Actions Panel -->
+        <div class="card" style="align-self: start;">
+            <div class="card-header"><h5>操作</h5></div>
             <div class="card-body" id="actions-panel">
                 {% if status == 'ready' %}
-                <a href="{{ url_for('dataset_browse', dataset_id=dataset.id) }}" class="btn btn-primary w-100 mb-2">
-                    <i class="fas fa-folder-open"></i> Browse Contents
+                <a href="{{ url_for('dataset_browse', dataset_id=dataset.id) }}" class="btn btn-primary" style="width: 100%; margin-bottom: 10px;">
+                    <i class="fas fa-folder-open"></i> 浏览内容
                 </a>
                 <form method="POST" action="{{ url_for('delete_dataset', dataset_id=dataset.id) }}"
-                      onsubmit="return confirm('Delete this dataset and all its files from disk?')">
-                    <button type="submit" class="btn btn-outline-danger w-100">
-                        <i class="fas fa-trash"></i> Delete Dataset
+                      onsubmit="return confirm('确定删除该数据集及磁盘上所有文件吗？')">
+                    <button type="submit" class="btn btn-ghost" style="width: 100%; color: var(--accent-rose);">
+                        <i class="fas fa-trash"></i> 删除数据集
                     </button>
                 </form>
 
                 {% elif status == 'downloading' %}
-                <div class="text-center" id="download-status">
-                    <div class="spinner-border text-primary mb-2" role="status"></div>
-                    <p class="text-muted">Downloading dataset...</p>
+                <div id="download-status" style="text-align: center; padding: 20px;">
+                    <div style="width: 32px; height: 32px; border: 3px solid var(--border-default); border-top-color: var(--accent-cyan); border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 12px;"></div>
+                    <p style="color: var(--text-tertiary); font-size: 0.88rem;">正在下载数据集...</p>
                 </div>
 
                 {% elif status == 'failed' %}
-                <div class="alert alert-danger mb-2">
-                    <i class="fas fa-exclamation-circle"></i> Download failed.
+                <div class="alert alert-rose" style="margin-bottom: 12px;">
+                    <i class="fas fa-exclamation-circle"></i> 下载失败。
                 </div>
                 <form method="POST" action="{{ url_for('download_openneuro') }}">
                     <input type="hidden" name="dataset_id" value="{{ dataset.id }}">
-                    <button type="submit" class="btn btn-warning w-100">
-                        <i class="fas fa-redo"></i> Retry Download
+                    <button type="submit" class="btn btn-primary" style="width: 100%;">
+                        <i class="fas fa-redo"></i> 重试下载
                     </button>
                 </form>
 
                 {% else %}
                 <form method="POST" action="{{ url_for('download_openneuro') }}">
                     <input type="hidden" name="dataset_id" value="{{ dataset.id }}">
-                    <button type="submit" class="btn btn-primary w-100">
-                        <i class="fas fa-download"></i> Download Dataset
+                    <button type="submit" class="btn btn-primary" style="width: 100%;">
+                        <i class="fas fa-download"></i> 下载数据集
                     </button>
                 </form>
                 {% endif %}
@@ -120,34 +111,57 @@
         </div>
     </div>
 </div>
+
+<style>
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (max-width: 768px) {
+    .page-container > div:last-child { grid-template-columns: 1fr !important; }
+}
+</style>
 {% endblock %}
 
 {% block scripts %}
 {% if status == 'downloading' %}
 <script>
-$(function() {
+(function() {
+    var browseUrl = "{{ url_for('dataset_browse', dataset_id=dataset.id) }}";
     var poll = setInterval(function() {
-        $.getJSON("{{ url_for('api_download_status', dataset_id=dataset.id) }}", function(data) {
-            if (data.status === 'completed') {
-                clearInterval(poll);
-                $('#download-status').html(
-                    '<div class="alert alert-success"><i class="fas fa-check-circle"></i> Download complete!</div>' +
-                    '<a href="{{ url_for("dataset_browse", dataset_id=dataset.id) }}" class="btn btn-primary w-100">' +
-                    '<i class="fas fa-folder-open"></i> Browse Contents</a>'
-                );
-            } else if (data.status === 'failed') {
-                clearInterval(poll);
-                $('#download-status').html(
-                    '<div class="alert alert-danger"><i class="fas fa-exclamation-circle"></i> Download failed: ' +
-                    (data.error || 'Unknown error') + '</div>' +
-                    '<form method="POST" action="{{ url_for("download_openneuro") }}">' +
-                    '<input type="hidden" name="dataset_id" value="{{ dataset.id }}">' +
-                    '<button type="submit" class="btn btn-warning w-100"><i class="fas fa-redo"></i> Retry</button></form>'
-                );
-            }
-        });
+        fetch("{{ url_for('api_download_status', dataset_id=dataset.id) }}")
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                var panel = document.getElementById('download-status');
+                if (!panel) { clearInterval(poll); return; }
+                if (data.status === 'completed') {
+                    clearInterval(poll);
+                    while (panel.firstChild) panel.removeChild(panel.firstChild);
+                    var msg = document.createElement('div');
+                    msg.className = 'alert alert-emerald';
+                    var icon = document.createElement('i');
+                    icon.className = 'fas fa-check-circle';
+                    msg.appendChild(icon);
+                    msg.appendChild(document.createTextNode(' 下载完成！'));
+                    panel.appendChild(msg);
+                    var link = document.createElement('a');
+                    link.href = browseUrl;
+                    link.className = 'btn btn-primary';
+                    link.style.width = '100%';
+                    link.style.marginTop = '10px';
+                    var linkIcon = document.createElement('i');
+                    linkIcon.className = 'fas fa-folder-open';
+                    link.appendChild(linkIcon);
+                    link.appendChild(document.createTextNode(' 浏览内容'));
+                    panel.appendChild(link);
+                } else if (data.status === 'failed') {
+                    clearInterval(poll);
+                    while (panel.firstChild) panel.removeChild(panel.firstChild);
+                    var err = document.createElement('div');
+                    err.className = 'alert alert-rose';
+                    err.textContent = '下载失败: ' + (data.error || '未知错误');
+                    panel.appendChild(err);
+                }
+            });
     }, 3000);
-});
+})();
 </script>
 {% endif %}
 {% endblock %}

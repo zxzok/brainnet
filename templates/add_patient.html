@@ -1,53 +1,50 @@
 {% extends "base.html" %}
-
-{% block title %}Add Patient - BrainNet MRI Data Management{% endblock %}
+{% block title %}添加被试 - BrainNet{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-    <h1 class="h2">Add New Patient</h1>
-</div>
+<div class="page-container" style="max-width: 640px;">
+    <div class="page-header">
+        <div>
+            <h1><i class="fas fa-user-plus"></i>添加被试</h1>
+            <p class="page-subtitle">注册新被试以进行分析</p>
+        </div>
+        <a href="{{ url_for('patients') }}" class="btn btn-ghost"><i class="fas fa-arrow-left"></i> 返回</a>
+    </div>
 
-<div class="row">
-    <div class="col-md-8">
-        <div class="card">
-            <div class="card-body">
-                <form method="POST" action="{{ url_for('add_patient') }}">
-                    <div class="mb-3">
-                        <label for="patient_id" class="form-label">Patient ID *</label>
-                        <input type="text" class="form-control" id="patient_id" name="patient_id" required>
+    <div class="card">
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('add_patient') }}">
+                <div class="form-group">
+                    <label class="form-label" for="patient_id">被试编号 <span style="color: var(--accent-rose);">*</span></label>
+                    <input type="text" class="form-input" id="patient_id" name="patient_id" required placeholder="例如 SUB-001">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="name">姓名 <span style="color: var(--accent-rose);">*</span></label>
+                    <input type="text" class="form-input" id="name" name="name" required placeholder="全名">
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                    <div class="form-group">
+                        <label class="form-label" for="age">年龄</label>
+                        <input type="number" class="form-input" id="age" name="age" placeholder="岁">
                     </div>
-                    <div class="mb-3">
-                        <label for="name" class="form-label">Name *</label>
-                        <input type="text" class="form-control" id="name" name="name" required>
+                    <div class="form-group">
+                        <label class="form-label" for="sex">性别</label>
+                        <select class="form-input" id="sex" name="sex">
+                            <option value="">请选择...</option>
+                            <option value="M">男</option>
+                            <option value="F">女</option>
+                        </select>
                     </div>
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="age" class="form-label">Age</label>
-                                <input type="number" class="form-control" id="age" name="age">
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="sex" class="form-label">Sex</label>
-                                <select class="form-select" id="sex" name="sex">
-                                    <option value="">Select...</option>
-                                    <option value="M">Male</option>
-                                    <option value="F">Female</option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="mb-3">
-                        <label for="diagnosis" class="form-label">Diagnosis</label>
-                        <input type="text" class="form-control" id="diagnosis" name="diagnosis">
-                    </div>
-                    <div class="d-flex justify-content-end gap-2">
-                        <a href="{{ url_for('patients') }}" class="btn btn-secondary">Cancel</a>
-                        <button type="submit" class="btn btn-primary">Add Patient</button>
-                    </div>
-                </form>
-            </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="diagnosis">诊断</label>
+                    <input type="text" class="form-input" id="diagnosis" name="diagnosis" placeholder="临床诊断或"健康对照"">
+                </div>
+                <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px;">
+                    <a href="{{ url_for('patients') }}" class="btn btn-ghost">取消</a>
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-plus"></i> 添加被试</button>
+                </div>
+            </form>
         </div>
     </div>
 </div>

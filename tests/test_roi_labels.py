@@ -16,7 +16,7 @@ Preprocessor = preproc_module.Preprocessor
 def test_roi_extraction_with_named_labels(tmp_path, monkeypatch):
     nib = pytest.importorskip('nibabel')
     # create simple atlas with two regions
-    atlas_data = np.array([[[1]], [[2]]])  # shape (2,1,1)
+    atlas_data = np.array([[[1]], [[2]]], dtype=np.int32)  # shape (2,1,1)
     atlas_img = nib.Nifti1Image(atlas_data, np.eye(4))
     atlas_path = tmp_path / 'atlas.nii.gz'
     nib.save(atlas_img, atlas_path)
@@ -27,7 +27,7 @@ def test_roi_extraction_with_named_labels(tmp_path, monkeypatch):
     func_img = nib.Nifti1Image(func_data, np.eye(4))
     func_path = tmp_path / 'func.nii.gz'
     nib.save(func_img, func_path)
-    cfg = PreprocConfig(extract_roi=False, retain_4d=False)
+    cfg = PreprocConfig(extract_roi=False, retain_4d=False, detrend=False)
     pre = Preprocessor(cfg)
     pre._atlas_data = {'dummy': atlas_data}
     pre._atlas_ids = {'dummy': [1, 2]}

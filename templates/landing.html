@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BrainNet — 功能磁共振脑网络动力学分析平台</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;600;700;900&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <style>
+        :root {
+            --bg-void: #030508;
+            --bg-deep: #080b12;
+            --bg-surface: #0d1018;
+            --text-primary: #e8ecf4;
+            --text-secondary: #8a93a8;
+            --text-muted: #4a5568;
+            --accent: #38d9c5;
+            --accent-glow: rgba(56, 217, 197, 0.12);
+            --accent-blue: #4a8eff;
+            --accent-violet: #9b6dff;
+            --accent-rose: #ff6b8a;
+            --border: rgba(100, 180, 220, 0.08);
+            --font-cn: 'Noto Sans SC', -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            --mono: 'JetBrains Mono', 'SF Mono', monospace;
+        }
+
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        html { font-size: 16px; scroll-behavior: smooth; -webkit-font-smoothing: antialiased; }
+        body {
+            font-family: var(--font-cn);
+            background: var(--bg-void);
+            color: var(--text-primary);
+            line-height: 1.7;
+            overflow-x: hidden;
+        }
+
+        /* ── Ambient Background ── */
+        .bg-mesh {
+            position: fixed; inset: 0; z-index: 0; pointer-events: none;
+            background:
+                radial-gradient(ellipse 60% 50% at 25% 0%, rgba(56, 217, 197, 0.06), transparent),
+                radial-gradient(ellipse 50% 40% at 75% 20%, rgba(74, 142, 255, 0.04), transparent),
+                radial-gradient(ellipse 40% 30% at 50% 80%, rgba(155, 109, 255, 0.03), transparent);
+        }
+
+        /* ── Noise texture ── */
+        .bg-noise {
+            position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.03;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+        }
+
+        section { position: relative; z-index: 1; }
+
+        /* ── Top Bar ── */
+        .top-bar {
+            position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+            height: 64px; display: flex; align-items: center; justify-content: space-between;
+            padding: 0 clamp(24px, 5vw, 80px);
+            background: rgba(3, 5, 8, 0.7);
+            backdrop-filter: blur(24px) saturate(1.3);
+            -webkit-backdrop-filter: blur(24px) saturate(1.3);
+            border-bottom: 1px solid var(--border);
+        }
+        .logo {
+            display: flex; align-items: center; gap: 12px; text-decoration: none; color: var(--text-primary);
+        }
+        .logo-icon {
+            width: 34px; height: 34px; border-radius: 10px;
+            background: linear-gradient(135deg, var(--accent), var(--accent-blue));
+            display: flex; align-items: center; justify-content: center;
+            font-size: 16px; color: var(--bg-void); font-weight: 800;
+        }
+        .logo-text { font-weight: 700; font-size: 1.15rem; letter-spacing: -0.03em; }
+        .logo-text span { color: var(--accent); }
+        .top-nav { display: flex; gap: 8px; align-items: center; }
+        .top-nav a {
+            padding: 8px 18px; border-radius: 8px; font-size: 0.88rem; font-weight: 500;
+            color: var(--text-secondary); text-decoration: none; transition: all 0.2s;
+        }
+        .top-nav a:hover { color: var(--text-primary); background: rgba(255,255,255,0.04); }
+        .btn-enter {
+            background: var(--accent) !important; color: var(--bg-void) !important;
+            font-weight: 600 !important; padding: 8px 22px !important; border-radius: 8px !important;
+        }
+        .btn-enter:hover { filter: brightness(1.1); transform: translateY(-1px); }
+
+        /* ── Hero ── */
+        .hero {
+            min-height: 100vh; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; text-align: center;
+            padding: 120px clamp(24px, 5vw, 80px) 80px;
+        }
+        .hero-badge {
+            display: inline-flex; align-items: center; gap: 8px;
+            padding: 6px 16px; border-radius: 40px;
+            background: rgba(56, 217, 197, 0.06); border: 1px solid rgba(56, 217, 197, 0.12);
+            font-size: 0.82rem; font-weight: 500; color: var(--accent);
+            margin-bottom: 32px; animation: fadeIn 0.6s ease;
+        }
+        .hero-badge .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); animation: pulse 2s infinite; }
+        .hero h1 {
+            font-size: clamp(2.4rem, 5.5vw, 4.2rem); font-weight: 900; letter-spacing: -0.04em;
+            line-height: 1.15; max-width: 800px; margin-bottom: 24px;
+            animation: fadeUp 0.7s ease;
+        }
+        .hero h1 .gradient {
+            background: linear-gradient(135deg, var(--accent), var(--accent-blue), var(--accent-violet));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .hero p {
+            font-size: 1.12rem; color: var(--text-secondary); max-width: 560px;
+            line-height: 1.8; margin-bottom: 48px; animation: fadeUp 0.8s ease;
+        }
+        .hero-actions {
+            display: flex; gap: 14px; animation: fadeUp 0.9s ease;
+        }
+        .btn-hero {
+            display: inline-flex; align-items: center; gap: 10px;
+            padding: 14px 32px; border-radius: 12px; font-size: 1rem; font-weight: 600;
+            text-decoration: none; transition: all 0.25s; cursor: pointer; border: none;
+        }
+        .btn-primary-hero {
+            background: var(--accent); color: var(--bg-void);
+            box-shadow: 0 0 30px rgba(56, 217, 197, 0.2);
+        }
+        .btn-primary-hero:hover { transform: translateY(-2px); box-shadow: 0 0 50px rgba(56, 217, 197, 0.3); filter: brightness(1.1); }
+        .btn-secondary-hero {
+            background: rgba(255,255,255,0.04); color: var(--text-primary);
+            border: 1px solid var(--border);
+        }
+        .btn-secondary-hero:hover { background: rgba(255,255,255,0.08); }
+
+        /* ── Floating network ── */
+        .hero-visual {
+            margin-top: 80px; width: 100%; max-width: 900px; height: 240px;
+            position: relative; animation: fadeIn 1.2s ease;
+        }
+        .hero-visual canvas { width: 100%; height: 100%; }
+
+        /* ── Features ── */
+        .features {
+            padding: 120px clamp(24px, 5vw, 80px);
+            max-width: 1200px; margin: 0 auto;
+        }
+        .section-label {
+            font-size: 0.78rem; font-weight: 600; text-transform: uppercase;
+            letter-spacing: 0.1em; color: var(--accent); margin-bottom: 12px;
+        }
+        .section-title {
+            font-size: clamp(1.8rem, 3vw, 2.6rem); font-weight: 800;
+            letter-spacing: -0.03em; margin-bottom: 16px;
+        }
+        .section-desc {
+            font-size: 1.05rem; color: var(--text-secondary); max-width: 560px;
+            margin-bottom: 56px; line-height: 1.7;
+        }
+        .feature-grid {
+            display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;
+        }
+        .feature-card {
+            padding: 32px 28px; border-radius: 16px;
+            background: var(--bg-deep); border: 1px solid var(--border);
+            transition: all 0.3s; position: relative; overflow: hidden;
+        }
+        .feature-card::before {
+            content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+            background: linear-gradient(90deg, var(--accent), var(--accent-blue));
+            opacity: 0; transition: opacity 0.3s;
+        }
+        .feature-card:hover { border-color: rgba(56, 217, 197, 0.15); transform: translateY(-4px); }
+        .feature-card:hover::before { opacity: 1; }
+        .feature-icon {
+            width: 48px; height: 48px; border-radius: 14px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.2rem; margin-bottom: 20px;
+        }
+        .feature-card h3 { font-size: 1.1rem; font-weight: 700; margin-bottom: 10px; letter-spacing: -0.02em; }
+        .feature-card p { font-size: 0.9rem; color: var(--text-secondary); line-height: 1.65; }
+
+        /* ── Architecture Section ── */
+        .arch {
+            padding: 120px clamp(24px, 5vw, 80px);
+            max-width: 1200px; margin: 0 auto;
+        }
+        .arch-flow {
+            display: flex; align-items: center; justify-content: center; gap: 0;
+            flex-wrap: wrap; margin-top: 48px;
+        }
+        .arch-step {
+            padding: 24px 28px; border-radius: 14px; text-align: center; flex: 0 0 200px;
+            background: var(--bg-deep); border: 1px solid var(--border);
+        }
+        .arch-step .step-num {
+            font-family: var(--mono); font-size: 0.72rem; font-weight: 600;
+            color: var(--accent); margin-bottom: 8px;
+        }
+        .arch-step h4 { font-size: 0.95rem; font-weight: 600; margin-bottom: 6px; }
+        .arch-step p { font-size: 0.78rem; color: var(--text-muted); line-height: 1.5; }
+        .arch-arrow {
+            font-size: 1.2rem; color: var(--text-muted); padding: 0 12px;
+        }
+
+        /* ── CTA ── */
+        .cta {
+            padding: 120px clamp(24px, 5vw, 80px) 80px; text-align: center;
+        }
+        .cta-card {
+            max-width: 700px; margin: 0 auto; padding: 60px 48px; border-radius: 24px;
+            background: linear-gradient(135deg, rgba(56, 217, 197, 0.04), rgba(74, 142, 255, 0.04));
+            border: 1px solid rgba(56, 217, 197, 0.1);
+        }
+        .cta-card h2 { font-size: 2rem; font-weight: 800; margin-bottom: 16px; letter-spacing: -0.03em; }
+        .cta-card p { color: var(--text-secondary); margin-bottom: 32px; font-size: 1.05rem; }
+
+        /* ── Footer ── */
+        .footer {
+            padding: 40px clamp(24px, 5vw, 80px);
+            border-top: 1px solid var(--border);
+            display: flex; justify-content: space-between; align-items: center;
+            font-size: 0.82rem; color: var(--text-muted);
+        }
+        .footer a { color: var(--text-muted); text-decoration: none; }
+        .footer a:hover { color: var(--accent); }
+
+        /* ── Animations ── */
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes fadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes pulse { 0%,100% { opacity: 0.5; } 50% { opacity: 1; } }
+
+        /* ── Responsive ── */
+        @media (max-width: 768px) {
+            .feature-grid { grid-template-columns: 1fr; }
+            .arch-flow { flex-direction: column; }
+            .arch-arrow { transform: rotate(90deg); padding: 8px 0; }
+            .top-nav a:not(.btn-enter) { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-mesh"></div>
+    <div class="bg-noise"></div>
+
+    <!-- Top Bar -->
+    <header class="top-bar">
+        <a href="/" class="logo">
+            <div class="logo-icon"><i class="fas fa-brain"></i></div>
+            <div class="logo-text">Brain<span>Net</span></div>
+        </a>
+        <nav class="top-nav">
+            <a href="#features">核心功能</a>
+            <a href="#architecture">系统架构</a>
+            <a href="{{ url_for('index') }}" class="btn-enter"><i class="fas fa-arrow-right"></i> 进入控制台</a>
+        </nav>
+    </header>
+
+    <!-- Hero -->
+    <section class="hero">
+        <div class="hero-badge"><span class="dot"></span> 多智能体自动化分析平台</div>
+        <h1>功能磁共振<br><span class="gradient">脑网络动力学</span><br>分析计算平台</h1>
+        <p>基于 Claude AI 编排的多策略脑功能连接分析系统。从数据加载到静态/动态连接性分析，自动生成工作流、执行计算、验证结果。</p>
+        <div class="hero-actions">
+            <a href="{{ url_for('index') }}" class="btn-hero btn-primary-hero"><i class="fas fa-rocket"></i> 开始使用</a>
+            <a href="#features" class="btn-hero btn-secondary-hero"><i class="fas fa-info-circle"></i> 了解更多</a>
+        </div>
+        <div class="hero-visual"><canvas id="networkCanvas"></canvas></div>
+    </section>
+
+    <!-- Features -->
+    <section class="features" id="features">
+        <div class="section-label">核心功能</div>
+        <div class="section-title">端到端脑网络分析</div>
+        <div class="section-desc">从原始 fMRI 数据到科学发现，平台提供完整的自动化分析流水线。</div>
+
+        <div class="feature-grid">
+            <div class="feature-card">
+                <div class="feature-icon" style="background: rgba(56, 217, 197, 0.1); color: var(--accent);">
+                    <i class="fas fa-project-diagram"></i>
+                </div>
+                <h3>静态连接性分析</h3>
+                <p>基于 Pearson 相关、偏相关及切空间方法的功能连接矩阵计算，配合完整的图论指标提取。</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon" style="background: rgba(74, 142, 255, 0.1); color: var(--accent-blue);">
+                    <i class="fas fa-wave-square"></i>
+                </div>
+                <h3>动态分析</h3>
+                <p>滑动窗口动态功能连接，K-means 状态聚类、HMM 状态推断，状态驻留时间与转换概率分析。</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon" style="background: rgba(155, 109, 255, 0.1); color: var(--accent-violet);">
+                    <i class="fas fa-robot"></i>
+                </div>
+                <h3>AI 智能编排</h3>
+                <p>Claude 驱动的多策略分析编排器。描述分析目标，AI 自动设计流水线、比较策略、生成报告。</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon" style="background: rgba(255, 107, 138, 0.1); color: var(--accent-rose);">
+                    <i class="fas fa-database"></i>
+                </div>
+                <h3>OpenNeuro 集成</h3>
+                <p>内置 OpenNeuro 公共数据集浏览与下载，支持 BIDS 格式自动解析，一键开始分析。</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon" style="background: rgba(255, 179, 71, 0.1); color: #ffb347;">
+                    <i class="fas fa-chart-bar"></i>
+                </div>
+                <h3>特征提取</h3>
+                <p>18+ 种脑网络特征自动提取：度中心性、聚类系数、模块度、小世界属性、效率等图论指标。</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon" style="background: rgba(71, 217, 138, 0.1); color: #47d98a;">
+                    <i class="fas fa-network-wired"></i>
+                </div>
+                <h3>交互式可视化</h3>
+                <p>Cytoscape 网络拓扑图、Plotly 动态图表、连接矩阵热图，全面的数据可视化展示。</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Architecture -->
+    <section class="arch" id="architecture">
+        <div class="section-label">系统架构</div>
+        <div class="section-title">多智能体工作流</div>
+        <div class="section-desc">平台采用多智能体协作架构，根据分析目标自动选择和组合分析方法。</div>
+
+        <div class="arch-flow">
+            <div class="arch-step">
+                <div class="step-num">01</div>
+                <h4>数据加载</h4>
+                <p>BIDS / OpenNeuro<br>NIfTI 数据解析</p>
+            </div>
+            <div class="arch-arrow"><i class="fas fa-arrow-right"></i></div>
+            <div class="arch-step">
+                <div class="step-num">02</div>
+                <h4>预处理</h4>
+                <p>去趋势 · 去混淆<br>ROI 提取</p>
+            </div>
+            <div class="arch-arrow"><i class="fas fa-arrow-right"></i></div>
+            <div class="arch-step">
+                <div class="step-num">03</div>
+                <h4>分析计算</h4>
+                <p>静态 / 动态连接<br>图论指标</p>
+            </div>
+            <div class="arch-arrow"><i class="fas fa-arrow-right"></i></div>
+            <div class="arch-step">
+                <div class="step-num">04</div>
+                <h4>AI 编排</h4>
+                <p>Claude 多策略<br>比较与报告</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA -->
+    <section class="cta">
+        <div class="cta-card">
+            <h2>开始分析您的脑影像数据</h2>
+            <p>配置 Claude API 密钥，即可开始使用 AI 驱动的脑网络分析。</p>
+            <a href="{{ url_for('index') }}" class="btn-hero btn-primary-hero"><i class="fas fa-rocket"></i> 进入控制台</a>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <span>BrainNet © 2024 — 功能磁共振脑网络动力学分析计算平台</span>
+        <span>
+            <a href="https://github.com" target="_blank"><i class="fab fa-github"></i></a>
+        </span>
+    </footer>
+
+    <!-- Animated network background -->
+    <script>
+    (function() {
+        var canvas = document.getElementById('networkCanvas');
+        if (!canvas) return;
+        var ctx = canvas.getContext('2d');
+        var dpr = window.devicePixelRatio || 1;
+        var W, H, nodes = [], edges = [];
+
+        function resize() {
+            var rect = canvas.parentElement.getBoundingClientRect();
+            W = rect.width; H = rect.height;
+            canvas.width = W * dpr; canvas.height = H * dpr;
+            canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        }
+
+        function init() {
+            resize();
+            nodes = [];
+            for (var i = 0; i < 40; i++) {
+                nodes.push({
+                    x: Math.random() * W, y: Math.random() * H,
+                    vx: (Math.random() - 0.5) * 0.3, vy: (Math.random() - 0.5) * 0.3,
+                    r: Math.random() * 3 + 2
+                });
+            }
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, W, H);
+            // edges
+            for (var i = 0; i < nodes.length; i++) {
+                for (var j = i + 1; j < nodes.length; j++) {
+                    var dx = nodes[i].x - nodes[j].x, dy = nodes[i].y - nodes[j].y;
+                    var dist = Math.sqrt(dx*dx + dy*dy);
+                    if (dist < 150) {
+                        ctx.beginPath();
+                        ctx.moveTo(nodes[i].x, nodes[i].y);
+                        ctx.lineTo(nodes[j].x, nodes[j].y);
+                        ctx.strokeStyle = 'rgba(56, 217, 197, ' + (0.15 * (1 - dist/150)) + ')';
+                        ctx.lineWidth = 0.8;
+                        ctx.stroke();
+                    }
+                }
+            }
+            // nodes
+            for (var k = 0; k < nodes.length; k++) {
+                var n = nodes[k];
+                ctx.beginPath();
+                ctx.arc(n.x, n.y, n.r, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(56, 217, 197, 0.6)';
+                ctx.fill();
+                // move
+                n.x += n.vx; n.y += n.vy;
+                if (n.x < 0 || n.x > W) n.vx *= -1;
+                if (n.y < 0 || n.y > H) n.vy *= -1;
+            }
+            requestAnimationFrame(draw);
+        }
+
+        init();
+        draw();
+        window.addEventListener('resize', resize);
+    })();
+    </script>
+</body>
+</html>

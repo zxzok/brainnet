@@ -1,31 +1,31 @@
 {% extends "base.html" %}
-{% block title %}Data Hub - BrainNet{% endblock %}
+{% block title %}数据中心 - BrainNet{% endblock %}
 
 {% block content %}
 <div class="page-container">
     <div class="page-header">
         <div>
-            <h1><i class="fas fa-database"></i>Data Hub</h1>
-            <p class="page-subtitle">Manage and browse downloaded neuroimaging datasets</p>
+            <h1><i class="fas fa-database"></i>数据中心</h1>
+            <p class="page-subtitle">管理和浏览已下载的神经影像数据集</p>
         </div>
         <a href="{{ url_for('openneuro') }}" class="btn btn-primary">
-            <i class="fas fa-search"></i> Browse OpenNeuro
+            <i class="fas fa-search"></i> 浏览 OpenNeuro
         </a>
     </div>
 
     {% if downloads %}
     <div class="mb-lg">
-        <h3 style="font-size: 0.78rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-tertiary); margin-bottom: 12px;">Active Downloads</h3>
+        <h3 style="font-size: 0.78rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-tertiary); margin-bottom: 12px;">正在下载</h3>
         {% for dl in downloads %}
         <div class="alert alert-info" id="dl-{{ dl.dataset_id }}">
             <i class="fas fa-circle-notch spinner"></i>
-            <div>Downloading <strong>{{ dl.name }}</strong> <span style="font-family: var(--mono); font-size: 0.82rem;">({{ dl.dataset_id }})</span></div>
+            <div>正在下载 <strong>{{ dl.name }}</strong> <span style="font-family: var(--mono); font-size: 0.82rem;">({{ dl.dataset_id }})</span></div>
         </div>
         {% endfor %}
     </div>
     {% endif %}
 
-    <h3 style="font-size: 0.78rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-tertiary); margin-bottom: 14px;">Downloaded Datasets</h3>
+    <h3 style="font-size: 0.78rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-tertiary); margin-bottom: 14px;">已下载数据集</h3>
 
     {% if datasets %}
     <div class="grid grid-3">
@@ -51,19 +51,19 @@
                 </div>
                 <div style="display: flex; gap: 16px; font-size: 0.78rem; color: var(--text-tertiary);">
                     {% if ds.subjects %}<span><i class="fas fa-users" style="margin-right: 4px; opacity: 0.5;"></i>{{ ds.subjects }}</span>{% endif %}
-                    {% if ds.sessions %}<span><i class="fas fa-clock" style="margin-right: 4px; opacity: 0.5;"></i>{{ ds.sessions }} sess</span>{% endif %}
+                    {% if ds.sessions %}<span><i class="fas fa-clock" style="margin-right: 4px; opacity: 0.5;"></i>{{ ds.sessions }} 会话</span>{% endif %}
                     {% if ds.total_files %}<span><i class="fas fa-file" style="margin-right: 4px; opacity: 0.5;"></i>{{ ds.total_files }}</span>{% endif %}
                 </div>
             </div>
             <div class="card-footer" style="display: flex; gap: 8px;">
                 <a href="{{ url_for('dataset_browse', dataset_id=ds.dataset_id) }}" class="btn btn-sm btn-ghost" style="flex: 1; justify-content: center;">
-                    <i class="fas fa-folder-open"></i> Browse
+                    <i class="fas fa-folder-open"></i> 浏览
                 </a>
                 <a href="{{ url_for('openneuro_detail', dataset_id=ds.dataset_id) }}" class="btn btn-sm btn-ghost" style="flex: 1; justify-content: center;">
-                    <i class="fas fa-info-circle"></i> Details
+                    <i class="fas fa-info-circle"></i> 详情
                 </a>
                 <form method="POST" action="{{ url_for('delete_dataset', dataset_id=ds.dataset_id) }}"
-                      onsubmit="return confirm('Delete this dataset and all files from disk?')">
+                      onsubmit="return confirm('确定删除该数据集及磁盘上所有文件吗？')">
                     <button type="submit" class="btn btn-sm btn-danger"><i class="fas fa-trash"></i></button>
                 </form>
             </div>
@@ -74,8 +74,8 @@
     <div class="card">
         <div class="empty-state">
             <div class="empty-state-icon"><i class="fas fa-database"></i></div>
-            <p>No datasets downloaded yet. Browse OpenNeuro to find and download neuroimaging datasets.</p>
-            <a href="{{ url_for('openneuro') }}" class="btn btn-primary"><i class="fas fa-search"></i> Browse OpenNeuro</a>
+            <p>尚未下载数据集。浏览 OpenNeuro 以查找和下载神经影像数据集。</p>
+            <a href="{{ url_for('openneuro') }}" class="btn btn-primary"><i class="fas fa-search"></i> 浏览 OpenNeuro</a>
         </div>
     </div>
     {% endif %}
@@ -106,10 +106,10 @@
                         var b = document.createElement('strong');
                         b.textContent = id;
                         info.appendChild(b);
-                        info.appendChild(document.createTextNode(' downloaded. '));
+                        info.appendChild(document.createTextNode(' 已下载完成。 '));
                         var link = document.createElement('a');
                         link.href = location.href;
-                        link.textContent = 'Refresh';
+                        link.textContent = '刷新';
                         info.appendChild(link);
                         el.appendChild(info);
                         done++;
@@ -123,7 +123,7 @@
                         var errB = document.createElement('strong');
                         errB.textContent = id;
                         errInfo.appendChild(errB);
-                        errInfo.appendChild(document.createTextNode(' failed: ' + (data.error || 'Unknown')));
+                        errInfo.appendChild(document.createTextNode(' 下载失败: ' + (data.error || '未知错误')));
                         el.appendChild(errInfo);
                         done++;
                     }

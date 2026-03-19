@@ -1,12 +1,12 @@
 {% extends "base.html" %}
-{% block title %}System Status - BrainNet{% endblock %}
+{% block title %}系统状态 - BrainNet{% endblock %}
 
 {% block content %}
 <div class="page-container">
     <div class="page-header">
         <div>
-            <h1><i class="fas fa-cog"></i>System Status</h1>
-            <p class="page-subtitle">Dependency status and pipeline readiness</p>
+            <h1><i class="fas fa-cog"></i>系统状态</h1>
+            <p class="page-subtitle">依赖状态与流水线就绪情况</p>
         </div>
     </div>
 
@@ -14,41 +14,41 @@
     <div class="alert alert-warning mb-lg">
         <i class="fas fa-exclamation-triangle"></i>
         <div>
-            <strong>Analysis Pipeline Unavailable</strong>
-            <p style="margin: 6px 0 0; opacity: 0.85;">Missing dependencies: <code>{{ analysis_error }}</code></p>
+            <strong>分析流水线不可用</strong>
+            <p style="margin: 6px 0 0; opacity: 0.85;">缺少依赖: <code>{{ analysis_error }}</code></p>
         </div>
     </div>
     {% else %}
     <div class="alert alert-success mb-lg">
         <i class="fas fa-check-circle"></i>
-        <div><strong>Analysis pipeline is ready.</strong> All required dependencies installed.</div>
+        <div><strong>分析流水线已就绪。</strong> 所有必需依赖已安装。</div>
     </div>
     {% endif %}
 
     <div class="card mb-lg">
         <div class="card-header">
-            <h5>Python Dependencies</h5>
+            <h5>Python 依赖</h5>
         </div>
         <div style="padding: 0;">
             <table>
                 <thead>
                     <tr>
-                        <th>Package</th>
-                        <th>Status</th>
-                        <th>Required For</th>
+                        <th>包</th>
+                        <th>状态</th>
+                        <th>用途</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% set pkg_info = {
-                        'numpy': 'Core numerical computation',
-                        'scipy': 'Smoothing, temporal filtering',
-                        'pandas': 'Confound handling',
-                        'nibabel': 'Loading NIfTI MRI files',
-                        'nilearn': 'Built-in atlas templates (AAL, Harvard-Oxford)',
-                        'sklearn': 'K-means clustering (dynamic states)',
-                        'networkx': 'Graph metrics (degree, modularity, efficiency)',
-                        'plotly': 'Interactive report generation',
-                        'hmmlearn': 'Hidden Markov Model analysis (optional)'
+                        'numpy': '核心数值计算',
+                        'scipy': '平滑、时间滤波',
+                        'pandas': '混淆变量处理',
+                        'nibabel': '加载 NIfTI MRI 文件',
+                        'nilearn': '内置脑图谱模板 (AAL, Harvard-Oxford)',
+                        'sklearn': 'K-means 聚类 (动态状态)',
+                        'networkx': '图论指标 (度、模块度、效率)',
+                        'plotly': '交互式报告生成',
+                        'hmmlearn': '隐马尔可夫模型分析 (可选)'
                     } %}
                     {% for pkg, version in deps.items() %}
                     <tr>
@@ -57,7 +57,7 @@
                             {% if version %}
                             <span class="badge badge-emerald"><i class="fas fa-check" style="font-size: 0.6rem;"></i> {{ version }}</span>
                             {% else %}
-                            <span class="badge badge-rose"><i class="fas fa-times" style="font-size: 0.6rem;"></i> Missing</span>
+                            <span class="badge badge-rose"><i class="fas fa-times" style="font-size: 0.6rem;"></i> 未安装</span>
                             {% endif %}
                         </td>
                         <td style="color: var(--text-tertiary); font-size: 0.82rem;">{{ pkg_info.get(pkg, '') }}</td>
@@ -70,7 +70,7 @@
 
     <div class="card">
         <div class="card-header">
-            <h5>Install All Required Dependencies</h5>
+            <h5>安装所有必需依赖</h5>
         </div>
         <div class="card-body">
             <pre><code>pip install numpy scipy pandas nibabel nilearn scikit-learn networkx plotly</code></pre>

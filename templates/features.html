@@ -1,56 +1,39 @@
 {% extends "base.html" %}
-{% block title %}Features - BrainNet{% endblock %}
+{% block title %}计算特征 - BrainNet{% endblock %}
 
 {% block content %}
 <div class="page-container">
     <div class="page-header">
         <div>
-            <h1><i class="fas fa-chart-bar"></i>Computed Features</h1>
-            <p class="page-subtitle">Graph-theoretic and summary features for this image</p>
-        </div>
-        <a href="{{ url_for('patient_detail', patient_id=1) }}" class="btn btn-ghost">
-            <i class="fas fa-arrow-left"></i> Back to Subject
-        </a>
-    </div>
-
-    <div class="card mb-lg">
-        <div class="card-body">
-            <div style="display: flex; align-items: center; gap: 14px;">
-                <div style="width: 40px; height: 40px; border-radius: 10px; background: var(--accent-cyan-glow); display: flex; align-items: center; justify-content: center;">
-                    <i class="fas fa-brain" style="color: var(--accent-cyan);"></i>
-                </div>
-                <div>
-                    <div style="font-size: 0.78rem; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.06em;">Subject</div>
-                    <div style="font-weight: 600; font-size: 1rem;">{{ image_info[1] }}</div>
-                </div>
-            </div>
+            <h1><i class="fas fa-chart-bar"></i>计算特征</h1>
+            <p class="page-subtitle">所有影像的图论与动态特征</p>
         </div>
     </div>
 
-    {% if features %}
+    {% if images %}
     <div class="table-container">
         <table>
             <thead>
                 <tr>
-                    <th>Feature Name</th>
-                    <th>Value</th>
-                    <th>Type</th>
-                    <th>Calculated</th>
+                    <th>被试</th>
+                    <th>影像类型</th>
+                    <th>特征数</th>
+                    <th>最近计算</th>
+                    <th></th>
                 </tr>
             </thead>
             <tbody>
-                {% for feature in features %}
+                {% for img in images %}
                 <tr>
-                    <td style="color: var(--text-primary); font-weight: 500;">{{ feature[0] }}</td>
-                    <td><span class="mono" style="color: var(--accent-cyan);">{{ "%.4f"|format(feature[1]) }}</span></td>
+                    <td style="font-weight: 500;">{{ img[1] }}</td>
+                    <td><span class="badge badge-blue">{{ img[2] or 'fMRI' }}</span></td>
+                    <td><span class="mono" style="color: var(--accent-cyan);">{{ img[3] }}</span></td>
+                    <td style="font-family: var(--mono); font-size: 0.78rem; color: var(--text-tertiary);">{{ img[4] }}</td>
                     <td>
-                        {% if feature[2] %}
-                        <span class="badge badge-blue">{{ feature[2] }}</span>
-                        {% else %}
-                        <span style="color: var(--text-ghost);">N/A</span>
-                        {% endif %}
+                        <a href="{{ url_for('view_features', image_id=img[0]) }}" class="btn btn-ghost" style="padding: 6px 12px; font-size: 0.8rem;">
+                            <i class="fas fa-eye"></i> 查看
+                        </a>
                     </td>
-                    <td style="font-family: var(--mono); font-size: 0.78rem; color: var(--text-tertiary);">{{ feature[3] }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -60,7 +43,7 @@
     <div class="card">
         <div class="empty-state">
             <div class="empty-state-icon"><i class="fas fa-chart-bar"></i></div>
-            <p>No features computed for this image yet.</p>
+            <p>尚未计算特征。请上传数据并运行分析以查看结果。</p>
         </div>
     </div>
     {% endif %}

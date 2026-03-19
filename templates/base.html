@@ -1,12 +1,12 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="zh-CN" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}BrainNet{% endblock %}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <style>
         /* ── Design System ─────────────────────────────────── */
@@ -37,7 +37,7 @@
             --accent-emerald: #47d98a;
 
             --mono: 'JetBrains Mono', 'SF Mono', 'Consolas', monospace;
-            --sans: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            --sans: 'Noto Sans SC', -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
 
             --radius-sm: 6px;
             --radius-md: 10px;
@@ -593,6 +593,35 @@
         .text-tertiary { color: var(--text-tertiary); }
         .text-secondary { color: var(--text-secondary); }
 
+        /* ── Forms ────────────────────────────────────────── */
+        .form-group { margin-bottom: 16px; }
+        .form-label {
+            display: block;
+            font-size: 0.82rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            margin-bottom: 6px;
+        }
+        .form-input {
+            width: 100%;
+            padding: 10px 14px;
+            background: var(--bg-deep);
+            border: 1px solid var(--border-default);
+            border-radius: var(--radius-sm);
+            color: var(--text-primary);
+            font-size: 0.88rem;
+            font-family: inherit;
+            transition: border-color var(--transition-default);
+            box-sizing: border-box;
+        }
+        .form-input:focus {
+            outline: none;
+            border-color: var(--accent-cyan);
+            box-shadow: 0 0 0 3px var(--accent-cyan-glow);
+        }
+        .form-input::placeholder { color: var(--text-ghost); }
+        select.form-input { cursor: pointer; }
+
         /* ── Empty States ──────────────────────────────────── */
         .empty-state {
             display: flex;
@@ -691,31 +720,34 @@
 
         <ul class="nav-links">
             <li><a class="nav-link {% if request.endpoint == 'index' %}active{% endif %}" href="{{ url_for('index') }}">
-                <i class="fas fa-th-large"></i> Dashboard
+                <i class="fas fa-th-large"></i> 控制台
             </a></li>
             <li><a class="nav-link {% if request.endpoint in ('patients', 'patient_detail', 'add_patient', 'edit_patient') %}active{% endif %}" href="{{ url_for('patients') }}">
-                <i class="fas fa-users"></i> Subjects
+                <i class="fas fa-users"></i> 被试管理
             </a></li>
             <li><a class="nav-link {% if request.endpoint == 'data_hub' %}active{% endif %}" href="{{ url_for('data_hub') }}">
-                <i class="fas fa-database"></i> Data Hub
+                <i class="fas fa-database"></i> 数据中心
             </a></li>
-            <li><a class="nav-link {% if request.endpoint in ('analysis', 'features', 'features_detail') %}active{% endif %}" href="{{ url_for('analysis') }}">
-                <i class="fas fa-chart-line"></i> Analysis
+            <li><a class="nav-link {% if request.endpoint in ('analysis', 'features_visualization', 'view_features') %}active{% endif %}" href="{{ url_for('analysis') }}">
+                <i class="fas fa-chart-line"></i> 分析
             </a></li>
             <li><a class="nav-link {% if request.endpoint in ('network_visualization',) %}active{% endif %}" href="{{ url_for('network_visualization') }}">
-                <i class="fas fa-project-diagram"></i> Network
+                <i class="fas fa-project-diagram"></i> 网络
             </a></li>
             <li><a class="nav-link {% if request.endpoint == 'chat_page' %}active{% endif %}" href="/chat">
-                <i class="fas fa-comments"></i> Chat
+                <i class="fas fa-comments"></i> AI 对话
             </a></li>
         </ul>
 
         <div class="nav-right">
+            <a class="nav-link {% if request.endpoint == 'settings' %}active{% endif %}" href="{{ url_for('settings') }}">
+                <i class="fas fa-key"></i> 设置
+            </a>
             <a class="nav-link {% if request.endpoint == 'system_status' %}active{% endif %}" href="{{ url_for('system_status') }}">
-                <i class="fas fa-cog"></i> System
+                <i class="fas fa-cog"></i> 系统
             </a>
             <div class="nav-indicator">
-                <span class="dot"></span> Online
+                <span class="dot"></span> 在线
             </div>
         </div>
     </nav>

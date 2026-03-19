@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Network Visualization - BrainNet{% endblock %}
+{% block title %}网络可视化 - BrainNet{% endblock %}
 
 {% block head %}
 <style>
@@ -48,8 +48,8 @@
 <div class="page-container wide">
     <div class="page-header">
         <div>
-            <h1><i class="fas fa-project-diagram"></i>Network Visualization</h1>
-            <p class="page-subtitle">Interactive brain network graph and dynamic feature trajectories</p>
+            <h1><i class="fas fa-project-diagram"></i>网络可视化</h1>
+            <p class="page-subtitle">交互式脑网络图与动态特征轨迹</p>
         </div>
     </div>
 
@@ -61,24 +61,24 @@
         <div class="feature-panel" style="display: flex; flex-direction: column; gap: 16px;">
             <div class="card">
                 <div class="card-header">
-                    <h5>Network Metrics</h5>
+                    <h5>网络指标</h5>
                 </div>
                 <div class="card-body">
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
                         <div class="stat-card" style="padding: 14px;">
-                            <div class="stat-label">Nodes</div>
+                            <div class="stat-label">节点</div>
                             <div class="stat-value cyan" style="font-size: 1.3rem;" id="nodeCount">--</div>
                         </div>
                         <div class="stat-card" style="padding: 14px;">
-                            <div class="stat-label">Edges</div>
+                            <div class="stat-label">边</div>
                             <div class="stat-value blue" style="font-size: 1.3rem;" id="edgeCount">--</div>
                         </div>
                         <div class="stat-card" style="padding: 14px;">
-                            <div class="stat-label">Density</div>
+                            <div class="stat-label">密度</div>
                             <div class="stat-value violet" style="font-size: 1.3rem;" id="density">--</div>
                         </div>
                         <div class="stat-card" style="padding: 14px;">
-                            <div class="stat-label">Components</div>
+                            <div class="stat-label">连通分量</div>
                             <div class="stat-value amber" style="font-size: 1.3rem;" id="components">--</div>
                         </div>
                     </div>
@@ -87,7 +87,7 @@
 
             <div class="card" style="flex: 1;">
                 <div class="card-header">
-                    <h5>Dynamic Features</h5>
+                    <h5>动态特征</h5>
                 </div>
                 <div class="card-body">
                     <div class="chart-wrap">

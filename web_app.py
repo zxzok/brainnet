@@ -135,6 +135,15 @@ def init_db():
         '''
     )
 
+    # User settings table (API keys, preferences)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS user_settings (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+
     # Ensure newer columns exist when upgrading from older schema
     cursor.execute('PRAGMA table_info(openneuro_datasets)')
     existing = {row[1] for row in cursor.fetchall()}
@@ -281,21 +290,91 @@ def _process_openneuro_for_patient(
         conn.close()
         process_image(image_id, run.path)
 
+# Helper to get/set user settings
+def get_setting(key: str, default: str = '') -> str:
+    conn = connect_db()
+    cur = conn.cursor()
+    cur.execute('SELECT value FROM user_settings WHERE key = ?', (key,))
+    row = cur.fetchone()
+    conn.close()
+    return row[0] if row else default
+
+
+def set_setting(key: str, value: str) -> None:
+    conn = connect_db()
+    cur = conn.cursor()
+    cur.execute(
+        'INSERT OR REPLACE INTO user_settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)',
+        (key, value),
+    )
+    conn.commit()
+    conn.close()
+
+
+def get_api_key() -> str:
+    """Get Anthropic API key from DB settings or environment."""
+    db_key = get_setting('anthropic_api_key')
+    if db_key:
+        return db_key
+    return os.environ.get('ANTHROPIC_API_KEY', '')
+
+
 # Routes
 @app.route('/')
+def landing():
+    """Landing / marketing homepage."""
+    return render_template('landing.html')
+
+
+@app.route('/console')
 def index():
-    """Main page showing all patients."""
+    """Main dashboard / console."""
     conn = connect_db()
     cursor = conn.cursor()
     cursor.execute('''
-        SELECT id, patient_id, name, age, sex, diagnosis, created_at 
-        FROM patients 
+        SELECT id, patient_id, name, age, sex, diagnosis, created_at
+        FROM patients
         ORDER BY created_at DESC
     ''')
     patients = cursor.fetchall()
+
+    # Count datasets and analyses
+    cursor.execute('SELECT COUNT(*) FROM openneuro_datasets')
+    dataset_count = cursor.fetchone()[0]
+    cursor.execute('SELECT COUNT(DISTINCT image_id) FROM features')
+    analysis_count = cursor.fetchone()[0]
     conn.close()
-    
-    return render_template('index.html', patients=patients)
+
+    has_api_key = bool(get_api_key())
+    return render_template('index.html', patients=patients,
+                           dataset_count=dataset_count,
+                           analysis_count=analysis_count,
+                           has_api_key=has_api_key)
+
+
+@app.route('/settings', methods=['GET', 'POST'])
+def settings():
+    """User settings — API key configuration."""
+    from flask import flash
+    if request.method == 'POST':
+        api_key = request.form.get('api_key', '').strip()
+        if api_key:
+            set_setting('anthropic_api_key', api_key)
+            # Also set in env for current process
+            os.environ['ANTHROPIC_API_KEY'] = api_key
+            flash('API 密钥已保存')
+        else:
+            # Clear the key
+            set_setting('anthropic_api_key', '')
+            os.environ.pop('ANTHROPIC_API_KEY', None)
+            flash('API 密钥已清除')
+        return redirect(url_for('settings'))
+
+    current_key = get_api_key()
+    masked_key = ''
+    if current_key:
+        masked_key = current_key[:8] + '•' * 20 + current_key[-4:]
+    return render_template('settings.html', masked_key=masked_key, has_key=bool(current_key))
 
 @app.route('/patients')
 def patients():
@@ -824,7 +903,22 @@ def mri_visualization():
 
 @app.route('/features')
 def features_visualization():
-    return render_template('features.html')
+    conn = connect_db()
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT mri_images.id, patients.name, mri_images.image_type,
+               COUNT(features.id) as feature_count,
+               MAX(features.calculated_at) as last_calc
+        FROM mri_images
+        JOIN patients ON mri_images.patient_id = patients.id
+        LEFT JOIN features ON features.image_id = mri_images.id
+        GROUP BY mri_images.id
+        HAVING feature_count > 0
+        ORDER BY last_calc DESC
+    ''')
+    images_with_features = cursor.fetchall()
+    conn.close()
+    return render_template('features.html', images=images_with_features)
 
 # Network visualization page
 @app.route('/network_visualization', methods=['GET'])
@@ -1127,7 +1221,7 @@ def internal_error(e):
 def main() -> None:
     """Run the Flask development server."""
 
-    app.run(debug=True, host='0.0.0.0', port=6525)
+    app.run(debug=False, host='0.0.0.0', port=6525)
 
 
 if __name__ == '__main__':

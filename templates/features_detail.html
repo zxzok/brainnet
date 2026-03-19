@@ -1,317 +1,258 @@
 {% extends "base.html" %}
+{% block title %}特征 - {{ image[4] }} - BrainNet{% endblock %}
 
-{% block title %}Features - {{ image[4] }} - BrainNet{% endblock %}
+{% block head %}
+<style>
+    .metric-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .metric-table { width: 100%; font-size: 0.85rem; }
+    .metric-table th { color: var(--text-tertiary); font-weight: 500; padding: 8px 12px; border-bottom: 1px solid var(--border-subtle); }
+    .metric-table td { padding: 8px 12px; border-bottom: 1px solid var(--border-subtle); }
+    .metric-table td:last-child { font-family: var(--mono); color: var(--accent-cyan); text-align: right; }
+    .collapsible-header {
+        padding: 12px 16px; cursor: pointer; display: flex; justify-content: space-between; align-items: center;
+        user-select: none; border-bottom: 1px solid var(--border-subtle);
+    }
+    .collapsible-header:hover { background: var(--bg-deep); }
+    .scrollable-body { max-height: 400px; overflow-y: auto; }
+    @media (max-width: 768px) { .metric-grid { grid-template-columns: 1fr; } }
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-    <div>
-        <nav aria-label="breadcrumb">
-            <ol class="breadcrumb mb-1">
-                <li class="breadcrumb-item"><a href="{{ url_for('patient_detail', patient_id=image[5]) }}">{{ image[4] }}</a></li>
-                <li class="breadcrumb-item active">Features</li>
-            </ol>
-        </nav>
-        <h1 class="h2"><i class="fas fa-chart-bar"></i> Analysis Results</h1>
-        <small class="text-muted">{{ image[3] or image[1] }}</small>
-    </div>
-    <div class="btn-toolbar">
-        <form method="POST" action="{{ url_for('recompute_features', image_id=image[0]) }}" class="me-2">
-            <button type="submit" class="btn btn-warning btn-sm">
-                <i class="fas fa-redo"></i> Recompute
-            </button>
-        </form>
-        <a href="{{ url_for('export_features', image_id=image[0]) }}" class="btn btn-outline-secondary btn-sm me-2">
-            <i class="fas fa-download"></i> Export JSON
-        </a>
-        <form method="POST" action="{{ url_for('delete_features', image_id=image[0]) }}"
-              onsubmit="return confirm('Delete all computed features for this image?')">
-            <button type="submit" class="btn btn-outline-danger btn-sm">
-                <i class="fas fa-trash"></i> Delete Features
-            </button>
-        </form>
-    </div>
-</div>
-
-{% if errors %}
-<div class="alert alert-danger">
-    <h5><i class="fas fa-exclamation-triangle"></i> Analysis Errors</h5>
-    {% for err in errors %}
-    <p class="mb-0"><code>{{ err.message }}</code> <small class="text-muted">({{ err.time }})</small></p>
-    {% endfor %}
-</div>
-{% endif %}
-
-{% if conn_matrix != 'null' %}
-<!-- Visualization Section -->
-<div class="row mb-4">
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header"><h5 class="mb-0"><i class="fas fa-th"></i> Connectivity Matrix</h5></div>
-            <div class="card-body">
-                <div id="conn-heatmap" style="width:100%; height:450px;"></div>
-            </div>
+<div class="page-container">
+    <div class="page-header">
+        <div>
+            <h1><i class="fas fa-chart-bar"></i>分析结果</h1>
+            <p class="page-subtitle">
+                <a href="{{ url_for('patient_detail', patient_id=image[5]) }}" style="color: var(--text-tertiary);">{{ image[4] }}</a>
+                <span style="color: var(--text-ghost); margin: 0 6px;">/</span>
+                {{ image[2] or image[1] }}
+            </p>
+        </div>
+        <div style="display: flex; gap: 8px;">
+            <form method="POST" action="{{ url_for('recompute_features', image_id=image[0]) }}" style="margin:0;">
+                <button type="submit" class="btn btn-ghost"><i class="fas fa-redo"></i> 重新计算</button>
+            </form>
+            <a href="{{ url_for('export_features', image_id=image[0]) }}" class="btn btn-ghost"><i class="fas fa-download"></i> 导出</a>
+            <form method="POST" action="{{ url_for('delete_features', image_id=image[0]) }}"
+                  onsubmit="return confirm('确定删除所有计算特征吗？')" style="margin:0;">
+                <button type="submit" class="btn btn-ghost" style="color: var(--accent-rose);"><i class="fas fa-trash"></i></button>
+            </form>
         </div>
     </div>
-    <div class="col-md-6">
+
+    {% if errors %}
+    <div class="alert alert-rose mb-lg">
+        <strong><i class="fas fa-exclamation-triangle"></i> 分析错误</strong>
+        {% for err in errors %}
+        <p style="margin: 4px 0 0;"><code>{{ err.message }}</code> <span style="color: var(--text-ghost); font-size: 0.78rem;">{{ err.time }}</span></p>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if conn_matrix != 'null' %}
+    <!-- Visualization -->
+    <div class="metric-grid mb-lg">
         <div class="card">
-            <div class="card-header"><h5 class="mb-0"><i class="fas fa-wave-square"></i> Dynamic States</h5></div>
+            <div class="card-header"><h5><i class="fas fa-th"></i> 连接矩阵</h5></div>
+            <div class="card-body">
+                <div id="conn-heatmap" style="width:100%; height:420px;"></div>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-header"><h5><i class="fas fa-wave-square"></i> 动态状态</h5></div>
             <div class="card-body">
                 {% if state_sequence != 'null' %}
-                <div id="state-timeline" style="width:100%; height:200px;"></div>
+                <div id="state-timeline" style="width:100%; height:180px;"></div>
                 {% endif %}
                 {% if dynamic_features %}
-                <div id="occupancy-chart" style="width:100%; height:230px;"></div>
-                <div id="dwell-chart" style="width:100%; height:230px;"></div>
+                <div id="occupancy-chart" style="width:100%; height:200px;"></div>
+                <div id="dwell-chart" style="width:100%; height:200px;"></div>
                 {% endif %}
-            </div>
-        </div>
-    </div>
-</div>
-{% endif %}
-
-<!-- Feature Tables -->
-<div class="row">
-    {% if static_features %}
-    <div class="col-md-6 mb-4">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="mb-0"><i class="fas fa-project-diagram"></i> Static Global Metrics</h5>
-            </div>
-            <div class="card-body p-0">
-                <table class="table table-striped mb-0">
-                    <thead><tr><th>Metric</th><th>Value</th></tr></thead>
-                    <tbody>
-                    {% for f in static_features %}
-                    <tr>
-                        <td>{{ f.name }}</td>
-                        <td><code>{{ "%.6f"|format(f.value) }}</code></td>
-                    </tr>
-                    {% endfor %}
-                    </tbody>
-                </table>
             </div>
         </div>
     </div>
     {% endif %}
 
-    {% if dynamic_features %}
-    {# Separate dynamic features into categories #}
-    {% set global_dynamic = [] %}
-    {% set per_state_temporal = [] %}
-    {% set transition_metrics = [] %}
-    {% set per_state_graph = [] %}
-    {% for f in dynamic_features %}
-        {% if f.name.startswith('transition_') %}
-            {% if transition_metrics.append(f) %}{% endif %}
-        {% elif f.name.startswith('state_') and ('occupancy' in f.name or 'dwell' in f.name or 'recurrence' in f.name or 'max_dwell' in f.name) %}
-            {% if per_state_temporal.append(f) %}{% endif %}
-        {% elif f.name.startswith('state_') and ('efficiency' in f.name or 'modularity' in f.name or 'connectivity' in f.name or 'density' in f.name or 'clustering' in f.name or 'assortativity' in f.name or 'path_length' in f.name or 'small_world' in f.name or 'centrality' in f.name or 'participation' in f.name) %}
-            {% if per_state_graph.append(f) %}{% endif %}
-        {% else %}
-            {% if global_dynamic.append(f) %}{% endif %}
-        {% endif %}
-    {% endfor %}
-
-    <div class="col-md-6 mb-4">
+    <!-- Feature Tables -->
+    <div class="metric-grid mb-lg">
+        {% if static_features %}
         <div class="card">
-            <div class="card-header">
-                <h5 class="mb-0"><i class="fas fa-chart-line"></i> Dynamic Summary Metrics</h5>
+            <div class="card-header"><h5><i class="fas fa-project-diagram"></i> 全局静态指标</h5></div>
+            <div class="card-body" style="padding: 0;">
+                <table class="metric-table">
+                    <thead><tr><th>指标</th><th>数值</th></tr></thead>
+                    <tbody>
+                    {% for f in static_features %}
+                    <tr><td>{{ f.name }}</td><td>{{ "%.6f"|format(f.value) }}</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
             </div>
-            <div class="card-body p-0">
-                <table class="table table-striped mb-0">
-                    <thead><tr><th>Metric</th><th>Value</th></tr></thead>
+        </div>
+        {% endif %}
+
+        {% if dynamic_features %}
+        {% set global_dynamic = [] %}
+        {% set per_state_temporal = [] %}
+        {% set transition_metrics = [] %}
+        {% set per_state_graph = [] %}
+        {% for f in dynamic_features %}
+            {% if f.name.startswith('transition_') %}
+                {% if transition_metrics.append(f) %}{% endif %}
+            {% elif f.name.startswith('state_') and ('occupancy' in f.name or 'dwell' in f.name or 'recurrence' in f.name or 'max_dwell' in f.name) %}
+                {% if per_state_temporal.append(f) %}{% endif %}
+            {% elif f.name.startswith('state_') and ('efficiency' in f.name or 'modularity' in f.name or 'connectivity' in f.name or 'density' in f.name or 'clustering' in f.name or 'assortativity' in f.name or 'path_length' in f.name or 'small_world' in f.name or 'centrality' in f.name or 'participation' in f.name) %}
+                {% if per_state_graph.append(f) %}{% endif %}
+            {% else %}
+                {% if global_dynamic.append(f) %}{% endif %}
+            {% endif %}
+        {% endfor %}
+
+        <div class="card">
+            <div class="card-header"><h5><i class="fas fa-chart-line"></i> 动态摘要</h5></div>
+            <div class="card-body" style="padding: 0;">
+                <table class="metric-table">
+                    <thead><tr><th>指标</th><th>数值</th></tr></thead>
                     <tbody>
                     {% for f in global_dynamic %}
-                    <tr>
-                        <td>{{ f.name }}</td>
-                        <td><code>{{ "%.6f"|format(f.value) }}</code></td>
-                    </tr>
+                    <tr><td>{{ f.name }}</td><td>{{ "%.6f"|format(f.value) }}</td></tr>
                     {% endfor %}
                     </tbody>
                 </table>
             </div>
         </div>
     </div>
-</div>
 
-<div class="row">
     {% if per_state_temporal %}
-    <div class="col-md-6 mb-4">
-        <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h5 class="mb-0"><i class="fas fa-exchange-alt"></i> Per-State Temporal Metrics</h5>
-                <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#per-state-temporal">
-                    Show/Hide ({{ per_state_temporal|length }})
-                </button>
-            </div>
-            <div class="collapse show" id="per-state-temporal">
-                <div class="card-body p-0">
-                    <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
-                        <table class="table table-sm table-striped mb-0">
-                            <thead><tr><th>Metric</th><th>Value</th></tr></thead>
-                            <tbody>
-                            {% for f in per_state_temporal %}
-                            <tr>
-                                <td>{{ f.name }}</td>
-                                <td><code>{{ "%.6f"|format(f.value) }}</code></td>
-                            </tr>
-                            {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
+    <div class="card mb-lg">
+        <div class="collapsible-header" onclick="var b=this.nextElementSibling; b.style.display=b.style.display==='none'?'block':'none';">
+            <h5 style="margin:0;"><i class="fas fa-exchange-alt"></i> 各状态时间指标 <span style="color: var(--text-ghost); font-size: 0.78rem;">({{ per_state_temporal|length }})</span></h5>
+            <i class="fas fa-chevron-down" style="color: var(--text-ghost); font-size: 0.7rem;"></i>
+        </div>
+        <div class="scrollable-body">
+            <table class="metric-table">
+                <thead><tr><th>指标</th><th>数值</th></tr></thead>
+                <tbody>
+                {% for f in per_state_temporal %}
+                <tr><td>{{ f.name }}</td><td>{{ "%.6f"|format(f.value) }}</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
         </div>
     </div>
     {% endif %}
 
     {% if transition_metrics %}
-    <div class="col-md-6 mb-4">
-        <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h5 class="mb-0"><i class="fas fa-arrows-alt"></i> Transition Probabilities</h5>
-                <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#transition-metrics">
-                    Show/Hide ({{ transition_metrics|length }})
-                </button>
-            </div>
-            <div class="collapse" id="transition-metrics">
-                <div class="card-body p-0">
-                    <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
-                        <table class="table table-sm table-striped mb-0">
-                            <thead><tr><th>Transition</th><th>Probability</th></tr></thead>
-                            <tbody>
-                            {% for f in transition_metrics %}
-                            <tr>
-                                <td>{{ f.name }}</td>
-                                <td><code>{{ "%.6f"|format(f.value) }}</code></td>
-                            </tr>
-                            {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
+    <div class="card mb-lg">
+        <div class="collapsible-header" onclick="var b=this.nextElementSibling; b.style.display=b.style.display==='none'?'block':'none';">
+            <h5 style="margin:0;"><i class="fas fa-arrows-alt"></i> 转换概率 <span style="color: var(--text-ghost); font-size: 0.78rem;">({{ transition_metrics|length }})</span></h5>
+            <i class="fas fa-chevron-down" style="color: var(--text-ghost); font-size: 0.7rem;"></i>
+        </div>
+        <div class="scrollable-body" style="display: none;">
+            <table class="metric-table">
+                <thead><tr><th>转换</th><th>概率</th></tr></thead>
+                <tbody>
+                {% for f in transition_metrics %}
+                <tr><td>{{ f.name }}</td><td>{{ "%.6f"|format(f.value) }}</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if per_state_graph %}
+    <div class="card mb-lg">
+        <div class="collapsible-header" onclick="var b=this.nextElementSibling; b.style.display=b.style.display==='none'?'block':'none';">
+            <h5 style="margin:0;"><i class="fas fa-sitemap"></i> 各状态图论指标 <span style="color: var(--text-ghost); font-size: 0.78rem;">({{ per_state_graph|length }})</span></h5>
+            <i class="fas fa-chevron-down" style="color: var(--text-ghost); font-size: 0.7rem;"></i>
+        </div>
+        <div class="scrollable-body">
+            <table class="metric-table">
+                <thead><tr><th>状态 / 指标</th><th>数值</th></tr></thead>
+                <tbody>
+                {% for f in per_state_graph %}
+                <tr><td>{{ f.name }}</td><td>{{ "%.6f"|format(f.value) }}</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+    {% endif %}
+
+    {% if static_node_features %}
+    <div class="card mb-lg">
+        <div class="collapsible-header" onclick="var b=this.nextElementSibling; b.style.display=b.style.display==='none'?'block':'none';">
+            <h5 style="margin:0;"><i class="fas fa-circle-nodes"></i> 节点级指标 <span style="color: var(--text-ghost); font-size: 0.78rem;">({{ static_node_features|length }})</span></h5>
+            <i class="fas fa-chevron-down" style="color: var(--text-ghost); font-size: 0.7rem;"></i>
+        </div>
+        <div class="scrollable-body" style="display: none;">
+            <table class="metric-table">
+                <thead><tr><th>ROI / 指标</th><th>数值</th></tr></thead>
+                <tbody>
+                {% for f in static_node_features %}
+                <tr><td>{{ f.name }}</td><td>{{ "%.6f"|format(f.value) }}</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if not static_features and not dynamic_features and not errors %}
+    <div class="card">
+        <div class="empty-state">
+            <div class="empty-state-icon"><i class="fas fa-hourglass-half"></i></div>
+            <p>尚未计算特征。分析可能仍在运行中。</p>
+            <button class="btn btn-ghost" onclick="location.reload()"><i class="fas fa-sync"></i> 刷新</button>
         </div>
     </div>
     {% endif %}
 </div>
-
-{% if per_state_graph %}
-<div class="card mb-4">
-    <div class="card-header d-flex justify-content-between align-items-center">
-        <h5 class="mb-0"><i class="fas fa-sitemap"></i> Per-State Graph Metrics</h5>
-        <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#per-state-graph">
-            Show/Hide ({{ per_state_graph|length }})
-        </button>
-    </div>
-    <div class="collapse show" id="per-state-graph">
-        <div class="card-body p-0">
-            <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
-                <table class="table table-sm table-striped mb-0">
-                    <thead><tr><th>State / Metric</th><th>Value</th></tr></thead>
-                    <tbody>
-                    {% for f in per_state_graph %}
-                    <tr>
-                        <td>{{ f.name }}</td>
-                        <td><code>{{ "%.6f"|format(f.value) }}</code></td>
-                    </tr>
-                    {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-</div>
-{% endif %}
-
-    {% endif %}
-
-{% if static_node_features %}
-<div class="card mb-4">
-    <div class="card-header d-flex justify-content-between align-items-center">
-        <h5 class="mb-0"><i class="fas fa-circle-nodes"></i> Node-level Metrics</h5>
-        <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#node-metrics">
-            Show/Hide ({{ static_node_features|length }} entries)
-        </button>
-    </div>
-    <div class="collapse" id="node-metrics">
-        <div class="card-body p-0">
-            <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
-                <table class="table table-sm table-striped mb-0">
-                    <thead><tr><th>ROI / Metric</th><th>Value</th></tr></thead>
-                    <tbody>
-                    {% for f in static_node_features %}
-                    <tr>
-                        <td>{{ f.name }}</td>
-                        <td><code>{{ "%.6f"|format(f.value) }}</code></td>
-                    </tr>
-                    {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-</div>
-{% endif %}
-
-{% if not static_features and not dynamic_features and not errors %}
-<div class="text-center py-5">
-    <i class="fas fa-hourglass-half fa-3x text-muted mb-3"></i>
-    <p class="text-muted">No features computed yet. Analysis may still be running.</p>
-    <button class="btn btn-outline-primary" onclick="location.reload()">
-        <i class="fas fa-sync"></i> Refresh
-    </button>
-</div>
-{% endif %}
 {% endblock %}
 
 {% block scripts %}
 <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
 <script>
-$(function() {
+(function() {
     var connMatrix = {{ conn_matrix }};
     var connLabels = {{ conn_labels }};
     var stateSeq = {{ state_sequence }};
 
-    // Connectivity heatmap
-    if (connMatrix) {
-        var heatData = [{
-            z: connMatrix,
-            x: connLabels,
-            y: connLabels,
-            type: 'heatmap',
-            colorscale: 'RdBu',
-            zmid: 0,
-            colorbar: {title: 'Correlation'}
-        }];
-        Plotly.newPlot('conn-heatmap', heatData, {
-            title: 'Functional Connectivity',
-            margin: {l: 80, r: 30, t: 40, b: 80},
-            xaxis: {tickangle: -45, tickfont: {size: 8}},
-            yaxis: {tickfont: {size: 8}}
-        }, {responsive: true});
+    var plotLayout = {
+        paper_bgcolor: 'rgba(0,0,0,0)',
+        plot_bgcolor: 'rgba(0,0,0,0)',
+        font: { color: '#8891a5', family: "'DM Sans', sans-serif", size: 11 },
+        margin: { l: 60, r: 20, t: 36, b: 60 }
+    };
+
+    if (connMatrix && document.getElementById('conn-heatmap')) {
+        Plotly.newPlot('conn-heatmap', [{
+            z: connMatrix, x: connLabels, y: connLabels,
+            type: 'heatmap', colorscale: 'RdBu', zmid: 0,
+            colorbar: { title: 'r', titlefont: { color: '#8891a5' }, tickfont: { color: '#5a6378' } }
+        }], Object.assign({}, plotLayout, {
+            title: { text: '功能连接性', font: { size: 13 } },
+            xaxis: { tickangle: -45, tickfont: { size: 7 } },
+            yaxis: { tickfont: { size: 7 } }
+        }), { responsive: true });
     }
 
-    // State timeline
     if (stateSeq && document.getElementById('state-timeline')) {
-        var timeData = [{
-            y: stateSeq,
-            mode: 'lines+markers',
-            type: 'scatter',
-            marker: {size: 3},
-            line: {width: 1}
-        }];
-        Plotly.newPlot('state-timeline', timeData, {
-            title: 'State Sequence',
-            xaxis: {title: 'Window'},
-            yaxis: {title: 'State', dtick: 1},
-            margin: {l: 50, r: 20, t: 40, b: 40}
-        }, {responsive: true});
+        Plotly.newPlot('state-timeline', [{
+            y: stateSeq, mode: 'lines+markers', type: 'scatter',
+            marker: { size: 3, color: '#4a8eff' }, line: { width: 1, color: '#4a8eff' }
+        }], Object.assign({}, plotLayout, {
+            title: { text: '状态序列', font: { size: 12 } },
+            xaxis: { title: '窗口' }, yaxis: { title: '状态', dtick: 1 },
+            margin: { l: 50, r: 20, t: 36, b: 36 }
+        }), { responsive: true });
     }
 
-    // Occupancy bar chart
-    var occFeatures = [];
-    var dwellFeatures = [];
+    var stateColors = ['#38d9c5', '#4a8eff', '#a78bfa', '#f5a623', '#e15759', '#76b7b2'];
+    var occFeatures = [], dwellFeatures = [];
     {% for f in dynamic_features %}
     {% if f.name.endswith('_occupancy') %}
     occFeatures.push({name: '{{ f.name }}', value: {{ f.value }}});
@@ -321,38 +262,29 @@ $(function() {
     {% endif %}
     {% endfor %}
 
-    var stateColors = ['#4e79a7', '#f28e2b', '#e15759', '#76b7b2', '#59a14f', '#edc948'];
-
     if (occFeatures.length > 0 && document.getElementById('occupancy-chart')) {
-        var barData = [{
-            x: occFeatures.map(function(f) { return f.name.replace('_occupancy', '').replace('state_', 'State '); }),
+        Plotly.newPlot('occupancy-chart', [{
+            x: occFeatures.map(function(f) { return f.name.replace('_occupancy', '').replace('state_', 'S'); }),
             y: occFeatures.map(function(f) { return f.value; }),
-            type: 'bar',
-            marker: {color: stateColors.slice(0, occFeatures.length)}
-        }];
-        Plotly.newPlot('occupancy-chart', barData, {
-            title: 'State Occupancy',
-            xaxis: {title: ''},
-            yaxis: {title: 'Fraction', range: [0, 1]},
-            margin: {l: 50, r: 20, t: 40, b: 40}
-        }, {responsive: true});
+            type: 'bar', marker: { color: stateColors.slice(0, occFeatures.length), opacity: 0.8 }
+        }], Object.assign({}, plotLayout, {
+            title: { text: '状态占有率', font: { size: 12 } },
+            yaxis: { title: '比例', range: [0, 1] },
+            margin: { l: 50, r: 20, t: 36, b: 36 }
+        }), { responsive: true });
     }
 
-    // Dwell time bar chart
     if (dwellFeatures.length > 0 && document.getElementById('dwell-chart')) {
-        var dwellData = [{
-            x: dwellFeatures.map(function(f) { return f.name.replace('_dwell_time', '').replace('state_', 'State '); }),
+        Plotly.newPlot('dwell-chart', [{
+            x: dwellFeatures.map(function(f) { return f.name.replace('_dwell_time', '').replace('state_', 'S'); }),
             y: dwellFeatures.map(function(f) { return f.value; }),
-            type: 'bar',
-            marker: {color: stateColors.slice(0, dwellFeatures.length)}
-        }];
-        Plotly.newPlot('dwell-chart', dwellData, {
-            title: 'Mean Dwell Time',
-            xaxis: {title: ''},
-            yaxis: {title: 'Windows'},
-            margin: {l: 50, r: 20, t: 40, b: 40}
-        }, {responsive: true});
+            type: 'bar', marker: { color: stateColors.slice(0, dwellFeatures.length), opacity: 0.8 }
+        }], Object.assign({}, plotLayout, {
+            title: { text: '平均驻留时间', font: { size: 12 } },
+            yaxis: { title: '窗口数' },
+            margin: { l: 50, r: 20, t: 36, b: 36 }
+        }), { responsive: true });
     }
-});
+})();
 </script>
 {% endblock %}

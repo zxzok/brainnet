@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Analysis - BrainNet{% endblock %}
+{% block title %}分析 - BrainNet{% endblock %}
 
 {% block head %}
 <style>
@@ -35,11 +35,11 @@
 <div class="page-container">
     <div class="page-header">
         <div>
-            <h1><i class="fas fa-chart-line"></i>Analysis</h1>
-            <p class="page-subtitle">Static and dynamic connectivity analysis results</p>
+            <h1><i class="fas fa-chart-line"></i>分析</h1>
+            <p class="page-subtitle">静态与动态连接性分析结果</p>
         </div>
         <a href="/chat" class="btn btn-primary">
-            <i class="fas fa-comments"></i> Run via Chat
+            <i class="fas fa-comments"></i> 通过 AI 对话运行
         </a>
     </div>
 
@@ -51,8 +51,8 @@
                         <i class="fas fa-project-diagram" style="color: var(--accent-cyan);"></i>
                     </div>
                     <div>
-                        <div class="card-title" style="margin-bottom: 0;">Static Connectivity</div>
-                        <div style="font-size: 0.78rem; color: var(--text-tertiary);">Pearson correlation matrices</div>
+                        <div class="card-title" style="margin-bottom: 0;">静态连接性</div>
+                        <div style="font-size: 0.78rem; color: var(--text-tertiary);">Pearson 相关矩阵</div>
                     </div>
                 </div>
                 <div class="chart-container">
@@ -68,8 +68,8 @@
                         <i class="fas fa-wave-square" style="color: var(--accent-blue);"></i>
                     </div>
                     <div>
-                        <div class="card-title" style="margin-bottom: 0;">Dynamic Analysis</div>
-                        <div style="font-size: 0.78rem; color: var(--text-tertiary);">Temporal state transitions</div>
+                        <div class="card-title" style="margin-bottom: 0;">动态分析</div>
+                        <div style="font-size: 0.78rem; color: var(--text-tertiary);">时间状态转换</div>
                     </div>
                 </div>
                 <div class="chart-container">
@@ -82,11 +82,11 @@
     <div class="card">
         <div class="card-body" style="text-align: center; padding: 40px;">
             <p style="color: var(--text-tertiary); font-size: 0.9rem; margin-bottom: 16px;">
-                Run an analysis through the AI orchestrator to see results here, or upload patient data for automated processing.
+                通过 AI 编排器运行分析以在此查看结果，或上传被试数据进行自动处理。
             </p>
             <div style="display: flex; gap: 10px; justify-content: center;">
-                <a href="/chat" class="btn btn-primary"><i class="fas fa-comments"></i> Start Analysis Chat</a>
-                <a href="{{ url_for('patients') }}" class="btn btn-ghost"><i class="fas fa-users"></i> View Subjects</a>
+                <a href="/chat" class="btn btn-primary"><i class="fas fa-comments"></i> 开始 AI 分析对话</a>
+                <a href="{{ url_for('patients') }}" class="btn btn-ghost"><i class="fas fa-users"></i> 查看被试</a>
             </div>
         </div>
     </div>

@@ -1,15 +1,15 @@
 {% extends "base.html" %}
-{% block title %}Server Error - BrainNet{% endblock %}
+{% block title %}服务器错误 - BrainNet{% endblock %}
 
 {% block content %}
 <div class="page-container">
     <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 60vh; text-align: center;">
         <div style="font-family: var(--mono); font-size: 5rem; font-weight: 700; color: var(--accent-rose); line-height: 1; margin-bottom: 16px; opacity: 0.4;">500</div>
-        <h2 style="font-size: 1.2rem; font-weight: 600; color: var(--text-primary); margin-bottom: 8px;">Something Went Wrong</h2>
-        <p style="color: var(--text-tertiary); font-size: 0.9rem; margin-bottom: 24px;">An internal error occurred. Please try again or check the system status.</p>
+        <h2 style="font-size: 1.2rem; font-weight: 600; color: var(--text-primary); margin-bottom: 8px;">服务器错误</h2>
+        <p style="color: var(--text-tertiary); font-size: 0.9rem; margin-bottom: 24px;">发生了内部错误，请重试或检查系统状态。</p>
         <div style="display: flex; gap: 10px;">
-            <a href="{{ url_for('index') }}" class="btn btn-primary"><i class="fas fa-arrow-left"></i> Dashboard</a>
-            <a href="{{ url_for('system_status') }}" class="btn btn-ghost"><i class="fas fa-cog"></i> System Status</a>
+            <a href="{{ url_for('index') }}" class="btn btn-primary"><i class="fas fa-arrow-left"></i> 控制台</a>
+            <a href="{{ url_for('system_status') }}" class="btn btn-ghost"><i class="fas fa-cog"></i> 系统状态</a>
         </div>
     </div>
 </div>

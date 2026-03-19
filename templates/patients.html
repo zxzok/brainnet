@@ -1,15 +1,15 @@
 {% extends "base.html" %}
-{% block title %}Subjects - BrainNet{% endblock %}
+{% block title %}被试管理 - BrainNet{% endblock %}
 
 {% block content %}
 <div class="page-container">
     <div class="page-header">
         <div>
-            <h1><i class="fas fa-users"></i>Subjects</h1>
-            <p class="page-subtitle">Manage patient records and associated imaging data</p>
+            <h1><i class="fas fa-users"></i>被试管理</h1>
+            <p class="page-subtitle">管理被试记录及相关影像数据</p>
         </div>
         <a href="{{ url_for('add_patient') }}" class="btn btn-primary">
-            <i class="fas fa-plus"></i> Add Subject
+            <i class="fas fa-plus"></i> 添加被试
         </a>
     </div>
 
@@ -18,13 +18,13 @@
         <table>
             <thead>
                 <tr>
-                    <th>Subject ID</th>
-                    <th>Name</th>
-                    <th>Age</th>
-                    <th>Sex</th>
-                    <th>Diagnosis</th>
-                    <th>Created</th>
-                    <th style="text-align: right;">Actions</th>
+                    <th>被试编号</th>
+                    <th>姓名</th>
+                    <th>年龄</th>
+                    <th>性别</th>
+                    <th>诊断</th>
+                    <th>创建时间</th>
+                    <th style="text-align: right;">操作</th>
                 </tr>
             </thead>
             <tbody>
@@ -49,10 +49,10 @@
                     <td style="text-align: right;">
                         <div style="display: flex; gap: 6px; justify-content: flex-end;">
                             <a href="{{ url_for('patient_detail', patient_id=patient[0]) }}" class="btn btn-sm btn-ghost">
-                                <i class="fas fa-eye"></i> View
+                                <i class="fas fa-eye"></i> 查看
                             </a>
                             <a href="{{ url_for('edit_patient', patient_id=patient[0]) }}" class="btn btn-sm btn-ghost">
-                                <i class="fas fa-pen"></i> Edit
+                                <i class="fas fa-pen"></i> 编辑
                             </a>
                         </div>
                     </td>
@@ -65,8 +65,8 @@
     <div class="card">
         <div class="empty-state">
             <div class="empty-state-icon"><i class="fas fa-users"></i></div>
-            <p>No subjects found. Add your first subject to start managing patient data and running analyses.</p>
-            <a href="{{ url_for('add_patient') }}" class="btn btn-primary"><i class="fas fa-plus"></i> Add Subject</a>
+            <p>暂无被试。添加第一位被试以开始管理数据并运行分析。</p>
+            <a href="{{ url_for('add_patient') }}" class="btn btn-primary"><i class="fas fa-plus"></i> 添加被试</a>
         </div>
     </div>
     {% endif %}

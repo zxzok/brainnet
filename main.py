@@ -174,7 +174,7 @@ def generate_patient_report(patient_id: int, output_dir: str) -> None:
     print(f"Report written to {report_path}")
 
 
-def parse_args(args: list[str]) -> argparse.Namespace:
+def parse_args(args: Optional[list[str]] = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run brainnet pipeline on a BIDS dataset")
     parser.add_argument(
         'dataset', nargs='?', type=str, default=None,
@@ -186,11 +186,12 @@ def parse_args(args: list[str]) -> argparse.Namespace:
     parser.add_argument('--task', type=str, help='Task name (e.g. rest)')
     parser.add_argument('--output', type=str, default='reports', help='Output directory for reports')
     parser.add_argument('--patient-id', type=int, default=None, help='Generate report for patient in DB')
+    parser.add_argument('--describe-plan', action='store_true', help='Print the analysis plan as JSON and exit')
     return parser.parse_args(args)
 
 
 def main(argv: Optional[list[str]] = None) -> None:
-    args = parse_args(argv or [])
+    args = parse_args(argv)
     if args.patient_id is not None:
         generate_patient_report(args.patient_id, args.output)
         return
@@ -201,6 +202,22 @@ def main(argv: Optional[list[str]] = None) -> None:
         dataset_path = DatasetManager.fetch_from_openneuro(args.openneuro_id)
     if dataset_path is None:
         raise SystemExit('Either a dataset path or --openneuro-id must be provided')
+    if args.describe_plan:
+        import json
+        plan = {
+            "mode": "local-bids",
+            "dataset": dataset_path,
+            "subject": args.subject,
+            "task": args.task,
+            "steps": [
+                {"key": "preprocessing", "description": "fMRI preprocessing pipeline"},
+                {"key": "static_analysis", "description": "Static connectivity and graph metrics"},
+                {"key": "dynamic_analysis", "description": "Sliding-window dynamic FC analysis"},
+                {"key": "report", "description": "Generate analysis report"},
+            ],
+        }
+        print(json.dumps(plan, indent=2))
+        return
     run_pipeline(dataset_path, args.subject, args.task, args.output)
 
 
